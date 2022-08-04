@@ -8,10 +8,7 @@ namespace TinyCoin
 {
     public static class ECDSA
     {
-        private static BigInteger _two = new BigInteger("02");
-        private static BigInteger _zero = new BigInteger("00");
-
-        private static ECKeyGenerationParameters Get_SECP256k1()
+        private static ECKeyGenerationParameters GetCurve()
         {
             var curve = ECNamedCurveTable.GetByName("secp256k1");
             var domainParams = new ECDomainParameters(curve.Curve, curve.G, curve.N, curve.H, curve.GetSeed());
@@ -24,7 +21,7 @@ namespace TinyCoin
 
         public static (byte[], byte[]) Generate()
         {
-            var keyParams = Get_SECP256k1();
+            var keyParams = GetCurve();
 
             var generator = new ECKeyPairGenerator("ECDSA");
             generator.Init(keyParams);
@@ -38,7 +35,7 @@ namespace TinyCoin
 
         public static byte[] GetPubKeyFromPrivKey(byte[] privKey)
         {
-            var keyParams = Get_SECP256k1();
+            var keyParams = GetCurve();
             var privKeyParams = new ECPrivateKeyParameters(new BigInteger(privKey), keyParams.DomainParameters);
 
             var publicKeyViaPrivate = privKeyParams.Parameters.G.Multiply(privKeyParams.D).Normalize();
