@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net6.0</TargetFramework>
+        <RootNamespace>tiny_coin_cs</RootNamespace>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <LangVersion>10</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Portable.BouncyCastle" Version="1.9.0"/>
+    </ItemGroup>
+
+</Project>
