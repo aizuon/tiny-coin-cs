@@ -1,4 +1,4 @@
-﻿namespace TinyCoin
+﻿namespace TinyCoin.Crypto
 {
     public static class Wallet
     {
@@ -11,10 +11,10 @@
             byte[] ripemd160WithVersionByte = Utils.HexStringToByteArray($"00{Utils.ByteArrayToHexString(ripemd160)}");
             byte[] sha256d = SHA256.DoubleHashBinary(ripemd160WithVersionByte);
             byte[] checksum = sha256d[..4];
-            byte[] binary_address =
+            byte[] binaryAddress =
                 Utils.HexStringToByteArray(
                     $"{Utils.ByteArrayToHexString(ripemd160WithVersionByte)}{Utils.ByteArrayToHexString(checksum)}");
-            string address = Base58.Encode(binary_address);
+            string address = Base58.Encode(binaryAddress);
             return $"{PubKeyHashVersion}{address}";
         }
     }

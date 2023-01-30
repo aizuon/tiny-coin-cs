@@ -4,7 +4,7 @@ using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Security;
 
-namespace TinyCoin
+namespace TinyCoin.Crypto
 {
     public static class ECDSA
     {

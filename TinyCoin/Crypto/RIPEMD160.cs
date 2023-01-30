@@ -1,21 +1,16 @@
 ﻿using Org.BouncyCastle.Crypto.Digests;
 
-namespace TinyCoin
+namespace TinyCoin.Crypto
 {
-    public static class SHA256
+    public static class RIPEMD160
     {
         public static byte[] HashBinary(byte[] buffer)
         {
-            var sha256 = new Sha256Digest();
+            var sha256 = new RipeMD160Digest();
             sha256.BlockUpdate(buffer, 0, buffer.Length);
             byte[] comparisonBytes = new byte[sha256.GetDigestSize()];
             sha256.DoFinal(comparisonBytes, 0);
             return comparisonBytes;
-        }
-
-        public static byte[] DoubleHashBinary(byte[] buffer)
-        {
-            return HashBinary(HashBinary(buffer));
         }
     }
 }

@@ -1,7 +1,7 @@
 ﻿using System;
 using Org.BouncyCastle.Math;
 
-namespace TinyCoin
+namespace TinyCoin.Crypto
 {
     public static class Base58
     {

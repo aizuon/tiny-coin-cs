@@ -1,4 +1,5 @@
 ﻿using TinyCoin;
+using TinyCoin.Crypto;
 using Xunit;
 
 namespace TinyTests
