@@ -2,10 +2,14 @@
 
 namespace TinyCoin.Tx
 {
-    public class TxOut : ISerializable, IDeserializable, IEquatable<TxOut>
+    public class TxOut : ISerializable, IDeserializable<TxOut>, IEquatable<TxOut>
     {
         public string ToAddress = string.Empty;
         public ulong Value;
+
+        public TxOut()
+        {
+        }
 
         public TxOut(ulong value, string toAddress)
         {
@@ -13,16 +17,15 @@ namespace TinyCoin.Tx
             ToAddress = toAddress;
         }
 
-        public bool Deserialize(BinaryBuffer buffer)
+        public static TxOut Deserialize(BinaryBuffer buffer)
         {
-            //TODO: rollback if fail
+            var txOut = new TxOut();
+            if (!buffer.Read(ref txOut.Value))
+                return null;
+            if (!buffer.Read(ref txOut.ToAddress))
+                return null;
 
-            if (!buffer.Read(ref Value))
-                return false;
-            if (!buffer.Read(ref ToAddress))
-                return false;
-
-            return true;
+            return txOut;
         }
 
         public bool Equals(TxOut other)
