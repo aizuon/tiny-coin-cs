@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace TinyCoin
 {
@@ -28,19 +29,18 @@ namespace TinyCoin
             Write(obj);
         }
 
-        public void Write<T>(T obj) where T : unmanaged
+        public unsafe void Write<T>(T obj) where T : unmanaged
         {
             lock (Mutex)
             {
                 uint length = (uint)Unsafe.SizeOf<T>();
                 GrowIfNeeded(length);
-                unsafe
+                fixed (byte* b = Buffer)
                 {
-                    fixed (byte* b = Buffer)
-                    {
-                        //TODO: endianness
-                        System.Buffer.MemoryCopy(&obj, b + WriteOffset, Buffer.Length - WriteOffset, length);
-                    }
+                    System.Buffer.MemoryCopy(&obj, b + WriteOffset, Buffer.Length - WriteOffset, length);
+
+                    if (!BitConverter.IsLittleEndian)
+                        Array.Reverse(Buffer, (int)WriteOffset, (int)length);
                 }
 
                 WriteOffset += length;
@@ -106,7 +106,7 @@ namespace TinyCoin
             return Read(ref obj);
         }
 
-        public bool Read<T>(ref T obj) where T : unmanaged
+        public unsafe bool Read<T>(ref T obj) where T : unmanaged
         {
             lock (Mutex)
             {
@@ -116,13 +116,23 @@ namespace TinyCoin
                 if (Buffer.Length < finalOffset)
                     return false;
 
-                unsafe
+                fixed (T* o = &obj)
+                fixed (byte* b = Buffer)
                 {
-                    fixed (T* p = &obj)
-                    fixed (byte* b = Buffer)
+                    byte* p = (byte*)o;
+
+                    System.Buffer.MemoryCopy(b + ReadOffset, p, length, length);
+
+                    if (!BitConverter.IsLittleEndian)
                     {
-                        //TODO: endianness
-                        System.Buffer.MemoryCopy(b + ReadOffset, p, length, length);
+                        byte* pStart = p;
+                        byte* pEnd = p + length - 1;
+                        for (int i = 0; i < length / 2; i++)
+                        {
+                            byte temp = *pStart;
+                            *pStart++ = *pEnd;
+                            *pEnd-- = temp;
+                        }
                     }
                 }
 
@@ -140,7 +150,7 @@ namespace TinyCoin
                 if (!ReadSize(ref size))
                     return false;
 
-                uint length = (uint)obj.Length * (uint)Unsafe.SizeOf<T>();
+                uint length = size * (uint)Unsafe.SizeOf<T>();
 
                 uint finalOffset = ReadOffset + length;
                 if (Buffer.Length < finalOffset)
@@ -163,20 +173,22 @@ namespace TinyCoin
                 if (!ReadSize(ref size))
                     return false;
 
-                uint length = (uint)obj.Length * sizeof(char);
+                uint length = size * sizeof(char);
 
                 uint finalOffset = ReadOffset + length;
                 if (Buffer.Length < finalOffset)
                     return false;
 
-                obj = string.Empty;
+                var objBld = new StringBuilder((int)size);
                 for (uint i = 0; i < size; i++)
                 {
                     char c = '\0';
                     if (!Read(ref c))
                         return false;
-                    obj += c;
+                    objBld.Append(c);
                 }
+
+                obj = objBld.ToString();
 
                 return true;
             }

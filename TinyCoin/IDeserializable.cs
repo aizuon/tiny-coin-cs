@@ -1,7 +1,7 @@
 ﻿namespace TinyCoin
 {
-    public interface IDeserializable
+    public interface IDeserializable<out T>
     {
-        public bool Deserialize(BinaryBuffer buffer);
+        public static abstract T Deserialize(BinaryBuffer buffer);
     }
 }
