@@ -1,48 +1,48 @@
 ﻿using System;
 
-namespace TinyCoin.Tx
+namespace TinyCoin.Txs
 {
-    public class TxOut : ISerializable, IDeserializable<TxOut>, IEquatable<TxOut>
+    public class TxOutPoint : ISerializable, IDeserializable<TxOutPoint>, IEquatable<TxOutPoint>
     {
-        public string ToAddress = string.Empty;
-        public ulong Value;
+        public string TxId = string.Empty;
+        public long TxOutIdx = -1;
 
-        public TxOut()
+        public TxOutPoint()
         {
         }
 
-        public TxOut(ulong value, string toAddress)
+        public TxOutPoint(string txId, long txOutIdx)
         {
-            Value = value;
-            ToAddress = toAddress;
+            TxId = txId;
+            TxOutIdx = txOutIdx;
         }
 
-        public static TxOut Deserialize(BinaryBuffer buffer)
+        public static TxOutPoint Deserialize(BinaryBuffer buffer)
         {
-            var txOut = new TxOut();
-            if (!buffer.Read(ref txOut.Value))
+            var txOutPoint = new TxOutPoint();
+            if (!buffer.Read(ref txOutPoint.TxId))
                 return null;
-            if (!buffer.Read(ref txOut.ToAddress))
+            if (!buffer.Read(ref txOutPoint.TxOutIdx))
                 return null;
 
-            return txOut;
+            return txOutPoint;
         }
 
-        public bool Equals(TxOut other)
+        public bool Equals(TxOutPoint other)
         {
             if (ReferenceEquals(null, other))
                 return false;
             if (ReferenceEquals(this, other))
                 return true;
-            return Value == other.Value && ToAddress == other.ToAddress;
+            return TxId == other.TxId && TxOutIdx == other.TxOutIdx;
         }
 
         public BinaryBuffer Serialize()
         {
             var buffer = new BinaryBuffer();
 
-            buffer.Write(Value);
-            buffer.Write(ToAddress);
+            buffer.Write(TxId);
+            buffer.Write(TxOutIdx);
 
             return buffer;
         }
@@ -55,15 +55,15 @@ namespace TinyCoin.Tx
                 return true;
             if (obj.GetType() != GetType())
                 return false;
-            return Equals((TxOut)obj);
+            return Equals((TxOutPoint)obj);
         }
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Value, ToAddress);
+            return HashCode.Combine(TxId, TxOutIdx);
         }
 
-        public static bool operator ==(TxOut lhs, TxOut rhs)
+        public static bool operator ==(TxOutPoint lhs, TxOutPoint rhs)
         {
             if (lhs is null)
             {
@@ -76,7 +76,7 @@ namespace TinyCoin.Tx
             return lhs.Equals(rhs);
         }
 
-        public static bool operator !=(TxOut lhs, TxOut rhs)
+        public static bool operator !=(TxOutPoint lhs, TxOutPoint rhs)
         {
             return !(lhs == rhs);
         }

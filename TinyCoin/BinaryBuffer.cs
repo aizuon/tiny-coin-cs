@@ -101,7 +101,7 @@ namespace TinyCoin
             }
         }
 
-        private bool ReadSize(ref uint obj)
+        public bool ReadSize(ref uint obj)
         {
             return Read(ref obj);
         }

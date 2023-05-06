@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace TinyCoin.Tx
+namespace TinyCoin.Txs
 {
     public class TxIn : ISerializable, IDeserializable<TxIn>, IEquatable<TxIn>
     {

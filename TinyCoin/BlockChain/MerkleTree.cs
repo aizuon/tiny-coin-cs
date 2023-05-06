@@ -6,7 +6,7 @@ namespace TinyCoin.BlockChain
 {
     public class MerkleNode
     {
-        public List<MerkleNode> Children;
+        public IList<MerkleNode> Children;
         public string Value;
 
         public MerkleNode(string value)
@@ -15,7 +15,7 @@ namespace TinyCoin.BlockChain
             Children = new List<MerkleNode>();
         }
 
-        public MerkleNode(string value, List<MerkleNode> children)
+        public MerkleNode(string value, IList<MerkleNode> children)
         {
             Value = value;
             Children = children;
@@ -24,7 +24,7 @@ namespace TinyCoin.BlockChain
 
     public class MerkleTree
     {
-        public static MerkleNode GetRoot(List<string> leaves)
+        public static MerkleNode GetRoot(IList<string> leaves)
         {
             var nodes = new List<MerkleNode>(leaves.Count);
             foreach (string l in leaves)
@@ -39,9 +39,9 @@ namespace TinyCoin.BlockChain
 
         //public static MerkleNode GetRootOfTxs(List<Tx> txs);
 
-        private static List<List<MerkleNode>> Chunk(List<MerkleNode> nodes, uint chunkSize)
+        private static IList<IList<MerkleNode>> Chunk(IList<MerkleNode> nodes, uint chunkSize)
         {
-            var chunks = new List<List<MerkleNode>>();
+            var chunks = new List<IList<MerkleNode>>();
 
             var chunk = new List<MerkleNode>((int)chunkSize);
             foreach (var node in nodes)
@@ -64,7 +64,7 @@ namespace TinyCoin.BlockChain
             return chunks;
         }
 
-        private static MerkleNode FindRoot(List<MerkleNode> nodes)
+        private static MerkleNode FindRoot(IList<MerkleNode> nodes)
         {
             var chunks = Chunk(nodes, 2);
             var newLevel = new List<MerkleNode>(chunks.Count);
