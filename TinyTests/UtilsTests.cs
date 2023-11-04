@@ -1,36 +1,35 @@
 ﻿using TinyCoin;
 using Xunit;
 
-namespace TinyTests
+namespace TinyTests;
+
+public class UtilsTests
 {
-    public class UtilsTests
+    [Fact]
+    public void ByteArrayToHexString()
     {
-        [Fact]
-        public void ByteArrayToHexString()
-        {
-            string hexString = Utils.ByteArrayToHexString(new byte[] {0x00, 0x01, 0x02, 0x03, 0x04});
+        string hexString = Utils.ByteArrayToHexString(new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04 });
 
-            Assert.Equal("0001020304", hexString);
-        }
+        Assert.Equal("0001020304", hexString);
+    }
 
-        [Fact]
-        public void HexStringToByteArray()
-        {
-            byte[] byteArray = Utils.HexStringToByteArray("0001020304");
+    [Fact]
+    public void HexStringToByteArray()
+    {
+        byte[] byteArray = Utils.HexStringToByteArray("0001020304");
 
-            byte[] assertedByteArray = {0x00, 0x01, 0x02, 0x03, 0x04};
+        byte[] assertedByteArray = { 0x00, 0x01, 0x02, 0x03, 0x04 };
 
-            Assert.Equal(byteArray, assertedByteArray);
-        }
+        Assert.Equal(byteArray, assertedByteArray);
+    }
 
-        [Fact]
-        public void StringToByteArray()
-        {
-            byte[] byteArray = Utils.StringToByteArray("foo");
+    [Fact]
+    public void StringToByteArray()
+    {
+        byte[] byteArray = Utils.StringToByteArray("foo");
 
-            byte[] assertedByteArray = Utils.HexStringToByteArray("666F6F");
+        byte[] assertedByteArray = Utils.HexStringToByteArray("666F6F");
 
-            Assert.Equal(byteArray, assertedByteArray);
-        }
+        Assert.Equal(byteArray, assertedByteArray);
     }
 }

@@ -1,7 +1,6 @@
-﻿namespace TinyCoin
+﻿namespace TinyCoin;
+
+public interface ISerializable
 {
-    public interface ISerializable
-    {
-        public BinaryBuffer Serialize();
-    }
+    public BinaryBuffer Serialize();
 }

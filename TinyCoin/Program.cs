@@ -1,9 +1,8 @@
-﻿namespace TinyCoin
+﻿namespace TinyCoin;
+
+public static class Program
 {
-    public static class Program
+    private static void Main()
     {
-        private static void Main()
-        {
-        }
     }
 }
