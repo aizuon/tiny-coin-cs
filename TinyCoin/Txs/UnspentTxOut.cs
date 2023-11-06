@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Serilog;
 using Serilog.Core;
+using TinyCoin.BlockChain;
 
 namespace TinyCoin.Txs;
 
@@ -125,10 +126,14 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
         }
     }
 
-    // public static TxOut FindTxOutInBlock(Block block, TxIn txIn)
-    // {
-    //     return null;
-    // }
+    public static TxOut FindTxOutInBlock(Block block, TxIn txIn)
+    {
+        foreach (var tx in block.Txs)
+            if (tx.Id() == txIn.ToSpend.TxId)
+                return tx.TxOuts[(int)txIn.ToSpend.TxOutIdx];
+
+        return null;
+    }
 
     public static TxOut FindTxOutInMap(TxIn txIn)
     {
@@ -143,10 +148,14 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
         }
     }
 
-    // public static TxOut FindTxOutInMapOrBlock(Block block, TxIn txIn)
-    // {
-    //     return null;
-    // }
+    public static TxOut FindTxOutInMapOrBlock(Block block, TxIn txIn)
+    {
+        var utxo = FindTxOutInMap(txIn);
+        if (utxo != null)
+            return utxo;
+
+        return FindTxOutInBlock(block, txIn);
+    }
 
     public override bool Equals(object obj)
     {
@@ -161,7 +170,7 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(TxOut, TxOutPoint, IsCoinbase, Height);
+        return HashCode.Combine(Height, IsCoinbase, TxOut, TxOutPoint);
     }
 
     public static bool operator ==(UnspentTxOut lhs, UnspentTxOut rhs)

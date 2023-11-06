@@ -1,12 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Serilog;
+using Serilog.Core;
 using TinyCoin.Crypto;
+using TinyCoin.P2P;
 
 namespace TinyCoin.Txs;
 
 public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>
 {
+    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(Tx));
+
     public long LockTime;
     public IList<TxIn> TxIns = new List<TxIn>();
     public IList<TxOut> TxOuts = new List<TxOut>();
@@ -87,17 +92,19 @@ public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>
         return tx;
     }
 
-    // private void ValidateSignatureForSpend(TxIn txIn, UnspentTxOut utxo)
-    // {
-    //     string pubKeyAsAddr = Wallet.PubKeyToAddress(txIn.UnlockPubKey);
-    //     if (pubKeyAsAddr != utxo.TxOut.ToAddress)
-    //         throw new TxUnlockException("Public key does not match");
-    //
-    //     var spendMsg = MsgSerializer.BuildSpendMsg(txIn.ToSpend, txIn.UnlockPubKey, txIn.Sequence, TxOuts);
-    //     if (!ECDSA.VerifySig(txIn.UnlockSig, spendMsg, txIn.UnlockPubKey))
-    //         // LOG_ERROR("Key verification failed");
-    //         throw new TxUnlockException("Signature does not match");
-    // }
+    private void ValidateSignatureForSpend(TxIn txIn, UnspentTxOut utxo)
+    {
+        string pubKeyAsAddr = Wallet.PubKeyToAddress(txIn.UnlockPubKey);
+        if (pubKeyAsAddr != utxo.TxOut.ToAddress)
+            throw new TxUnlockException("Public key does not match");
+
+        byte[] spendMsg = MsgSerializer.BuildSpendMsg(txIn.ToSpend, txIn.UnlockPubKey, txIn.Sequence, TxOuts);
+        if (!ECDSA.VerifySig(txIn.UnlockSig, spendMsg, txIn.UnlockPubKey))
+        {
+            Logger.Error("Key verification failed");
+            throw new TxUnlockException("Signature does not match");
+        }
+    }
 
     // public void Validate(ValidateRequest req)
     // {
@@ -185,7 +192,7 @@ public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(TxIns, TxOuts, LockTime);
+        return HashCode.Combine(LockTime, TxIns, TxOuts);
     }
 
     public static bool operator ==(Tx lhs, Tx rhs)

@@ -84,7 +84,7 @@ public class TxIn : ISerializable, IDeserializable<TxIn>, IEquatable<TxIn>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(ToSpend, UnlockSig, UnlockPubKey, Sequence);
+        return HashCode.Combine(Sequence, ToSpend, UnlockPubKey, UnlockSig);
     }
 
     public static bool operator ==(TxIn lhs, TxIn rhs)

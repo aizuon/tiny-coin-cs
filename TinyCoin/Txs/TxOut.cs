@@ -60,7 +60,7 @@ public class TxOut : ISerializable, IDeserializable<TxOut>, IEquatable<TxOut>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Value, ToAddress);
+        return HashCode.Combine(ToAddress, Value);
     }
 
     public static bool operator ==(TxOut lhs, TxOut rhs)
