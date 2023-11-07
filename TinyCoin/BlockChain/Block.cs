@@ -25,7 +25,7 @@ public class Block
     }
 
     public Block(ulong version, string prevBlockHash, string merkleHash, long timestamp,
-        byte bits, ulong nonce, List<Tx> txs)
+        byte bits, ulong nonce, IList<Tx> txs)
     {
     }
 

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using TinyCoin.Crypto;
+using TinyCoin.Txs;
 
 namespace TinyCoin.BlockChain;
 
@@ -37,7 +38,13 @@ public class MerkleTree
         return FindRoot(nodes);
     }
 
-    //public static MerkleNode GetRootOfTxs(List<Tx> txs);
+    public static MerkleNode GetRootOfTxs(IList<Tx> txs)
+    {
+        var hashes = new List<string>(txs.Count);
+        foreach (var tx in txs)
+            hashes.Add(tx.Id());
+        return GetRoot(hashes);
+    }
 
     private static IList<IList<MerkleNode>> Chunk(IList<MerkleNode> nodes, uint chunkSize)
     {

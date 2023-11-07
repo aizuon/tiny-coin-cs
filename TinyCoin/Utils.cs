@@ -1,4 +1,5 @@
-﻿using Org.BouncyCastle.Utilities.Encoders;
+﻿using System;
+using Org.BouncyCastle.Utilities.Encoders;
 
 namespace TinyCoin;
 
@@ -21,5 +22,10 @@ public static class Utils
             arr[i] = (byte)str[i];
 
         return arr;
+    }
+
+    public static long GetUnixTimestamp()
+    {
+        return DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }
 }

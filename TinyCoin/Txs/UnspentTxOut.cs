@@ -11,7 +11,7 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
 {
     private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(UnspentTxOut));
     public static readonly Dictionary<TxOutPoint, UnspentTxOut> Map = new Dictionary<TxOutPoint, UnspentTxOut>();
-    public static object Lock = new object();
+    public static readonly object Mutex = new object();
 
     public long Height = -1;
     public bool IsCoinbase;
@@ -72,7 +72,7 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
     public static void AddToMap(TxOut txOut, string txId, long idx, bool isCoinbase,
         long height)
     {
-        lock (Lock)
+        lock (Mutex)
         {
             var txOutPoint = new TxOutPoint(txId, idx);
 
@@ -86,7 +86,7 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
 
     public static void RemoveFromMap(string txId, long idx)
     {
-        lock (Lock)
+        lock (Mutex)
         {
             var mapIt = Map.Keys.FirstOrDefault(p => p.TxId == txId && p.TxOutIdx == idx);
             if (mapIt != null)
@@ -94,7 +94,7 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
         }
     }
 
-    public static UnspentTxOut FindInList(TxIn txIn, List<Tx> txs)
+    public static UnspentTxOut FindInList(TxIn txIn, IList<Tx> txs)
     {
         foreach (var tx in txs)
         {
@@ -116,7 +116,7 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
 
     public static UnspentTxOut FindInMap(TxOutPoint toSpend)
     {
-        lock (Lock)
+        lock (Mutex)
         {
             var mapIt = Map.Keys.FirstOrDefault(p => p == toSpend);
             if (mapIt != null)
@@ -137,7 +137,7 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
 
     public static TxOut FindTxOutInMap(TxIn txIn)
     {
-        lock (Lock)
+        lock (Mutex)
         {
             foreach (var utxo in Map.Values)
                 if (txIn.ToSpend.TxId == utxo.TxOutPoint.TxId &&

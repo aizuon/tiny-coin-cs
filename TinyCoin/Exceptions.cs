@@ -1,4 +1,5 @@
 ﻿using System;
+using TinyCoin.BlockChain;
 using TinyCoin.Txs;
 
 namespace TinyCoin;
@@ -24,16 +25,16 @@ public class TxValidationException : Exception
     }
 }
 
-// public class BlockValidationException : Exception
-// {
-//     public Block ToOrphan;
-//
-//     public BlockValidationException(string msg) : base(msg)
-//     {
-//     }
-//
-//     public BlockValidationException(string msg, Block toOrphan) : base(msg)
-//     {
-//         ToOrphan = toOrphan;
-//     }
-// }
+public class BlockValidationException : Exception
+{
+    public Block ToOrphan;
+
+    public BlockValidationException(string msg) : base(msg)
+    {
+    }
+
+    public BlockValidationException(string msg, Block toOrphan) : base(msg)
+    {
+        ToOrphan = toOrphan;
+    }
+}

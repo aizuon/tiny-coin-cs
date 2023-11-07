@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Serilog;
 using Serilog.Core;
+using TinyCoin.BlockChain;
 using TinyCoin.Crypto;
 using TinyCoin.P2P;
+using UTXO = TinyCoin.Txs.UnspentTxOut;
 
 namespace TinyCoin.Txs;
 
@@ -106,52 +108,52 @@ public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>
         }
     }
 
-    // public void Validate(ValidateRequest req)
-    // {
-    //     ValidateBasics(req.AsCoinbase);
-    //
-    //     ulong avaliableToSpend = 0;
-    //     foreach (var txIn in TxIns)
-    //     {
-    //         var utxo = UTXO.FindInMap(txIn.ToSpend);
-    //         if (utxo == null)
-    //         {
-    //             if (req.SiblingsInBlock.Count != 0)
-    //                 utxo = UTXO.FindInList(txIn, req.SiblingsInBlock);
-    //
-    //             if (req.Allow_UTXO_FromMempool)
-    //                 utxo = Mempool.Find_UTXO_InMempool(txIn.ToSpend);
-    //
-    //             if (utxo == null)
-    //                 throw new TxValidationException(
-    //                     $"Unable to find any UTXO for TxIn {Id()}, orphaning transaction",
-    //                     this);
-    //         }
-    //
-    //         if (utxo.IsCoinbase && Chain.GetCurrentHeight() - utxo.Height < NetParams.CoinbaseMaturity)
-    //             throw new TxValidationException("Coinbase UTXO not ready for spending");
-    //
-    //         try
-    //         {
-    //             ValidateSignatureForSpend(txIn, utxo);
-    //         }
-    //         catch (TxUnlockException ex)
-    //         {
-    //             // LOG_ERROR(ex.what());
-    //
-    //             throw new TxValidationException($"TxIn {Id()} not a valid spend of UTXO");
-    //         }
-    //
-    //         avaliableToSpend += utxo.TxOut.Value;
-    //     }
-    //
-    //     ulong totalSpent = 0;
-    //     foreach (var txOut in TxOuts)
-    //         totalSpent += txOut.Value;
-    //
-    //     if (avaliableToSpend < totalSpent)
-    //         throw new TxValidationException("Spent value more than available");
-    // }
+    public void Validate(ValidateRequest req)
+    {
+        ValidateBasics(req.AsCoinbase);
+
+        ulong avaliableToSpend = 0;
+        foreach (var txIn in TxIns)
+        {
+            var utxo = UTXO.FindInMap(txIn.ToSpend);
+            if (utxo == null)
+            {
+                if (req.SiblingsInBlock.Count != 0)
+                    utxo = UTXO.FindInList(txIn, req.SiblingsInBlock);
+
+                if (req.Allow_UTXO_FromMempool)
+                    utxo = Mempool.Find_UTXO_InMempool(txIn.ToSpend);
+
+                if (utxo == null)
+                    throw new TxValidationException(
+                        $"Unable to find any UTXO for TxIn {Id()}, orphaning transaction",
+                        this);
+            }
+
+            if (utxo.IsCoinbase && Chain.GetCurrentHeight() - utxo.Height < NetParams.CoinbaseMaturity)
+                throw new TxValidationException("Coinbase UTXO not ready for spending");
+
+            try
+            {
+                ValidateSignatureForSpend(txIn, utxo);
+            }
+            catch (TxUnlockException ex)
+            {
+                Logger.Error(ex, "");
+
+                throw new TxValidationException($"TxIn {Id()} not a valid spend of UTXO");
+            }
+
+            avaliableToSpend += utxo.TxOut.Value;
+        }
+
+        ulong totalSpent = 0;
+        foreach (var txOut in TxOuts)
+            totalSpent += txOut.Value;
+
+        if (avaliableToSpend < totalSpent)
+            throw new TxValidationException("Spent value more than available");
+    }
 
     public bool IsCoinbase()
     {

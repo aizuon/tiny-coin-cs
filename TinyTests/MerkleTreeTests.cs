@@ -11,8 +11,8 @@ public class MerkleTreeTests
     [Fact]
     public void OneChain()
     {
-        string foo = "foo";
-        string bar = "bar";
+        const string foo = "foo";
+        const string bar = "bar";
         var tree = new List<string> { foo, bar };
 
         var root = MerkleTree.GetRoot(tree);
@@ -30,9 +30,9 @@ public class MerkleTreeTests
     [Fact]
     public void TwoChain()
     {
-        string foo = "foo";
-        string bar = "bar";
-        string baz = "baz";
+        const string foo = "foo";
+        const string bar = "bar";
+        const string baz = "baz";
         var tree = new List<string> { foo, bar, baz };
 
         var root = MerkleTree.GetRoot(tree);

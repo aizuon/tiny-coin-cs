@@ -6,7 +6,7 @@ namespace TinyCoin;
 
 public class BinaryBuffer
 {
-    private readonly object Mutex = new object();
+    private readonly object _mutex = new object();
 
     public BinaryBuffer()
     {
@@ -31,7 +31,7 @@ public class BinaryBuffer
 
     public unsafe void Write<T>(T obj) where T : unmanaged
     {
-        lock (Mutex)
+        lock (_mutex)
         {
             uint length = (uint)Unsafe.SizeOf<T>();
             GrowIfNeeded(length);
@@ -49,7 +49,7 @@ public class BinaryBuffer
 
     public void Write<T>(T[] obj) where T : unmanaged
     {
-        lock (Mutex)
+        lock (_mutex)
         {
             uint size = (uint)obj.Length;
             WriteSize(size);
@@ -64,7 +64,7 @@ public class BinaryBuffer
 
     public void WriteRaw<T>(T[] obj) where T : unmanaged
     {
-        lock (Mutex)
+        lock (_mutex)
         {
             uint length = (uint)obj.Length * (uint)Unsafe.SizeOf<T>();
             GrowIfNeeded(length);
@@ -76,7 +76,7 @@ public class BinaryBuffer
 
     public void Write(string obj)
     {
-        lock (Mutex)
+        lock (_mutex)
         {
             uint size = (uint)obj.Length;
             WriteSize(size);
@@ -91,7 +91,7 @@ public class BinaryBuffer
 
     public void WriteRaw(string obj)
     {
-        lock (Mutex)
+        lock (_mutex)
         {
             uint length = (uint)obj.Length * sizeof(char);
             GrowIfNeeded(length);
@@ -108,7 +108,7 @@ public class BinaryBuffer
 
     public unsafe bool Read<T>(ref T obj) where T : unmanaged
     {
-        lock (Mutex)
+        lock (_mutex)
         {
             uint length = (uint)Unsafe.SizeOf<T>();
 
@@ -144,7 +144,7 @@ public class BinaryBuffer
 
     public bool Read<T>(ref T[] obj) where T : unmanaged
     {
-        lock (Mutex)
+        lock (_mutex)
         {
             uint size = 0;
             if (!ReadSize(ref size))
@@ -167,7 +167,7 @@ public class BinaryBuffer
 
     public bool Read(ref string obj)
     {
-        lock (Mutex)
+        lock (_mutex)
         {
             uint size = 0;
             if (!ReadSize(ref size))

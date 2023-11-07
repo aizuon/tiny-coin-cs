@@ -11,55 +11,55 @@ public class BinaryBufferTests
     {
         var buffer = new BinaryBuffer();
 
-        bool bReal = true;
+        const bool bReal = true;
         buffer.Write(bReal);
         bool bRead = false;
         Assert.True(buffer.Read(ref bRead));
         Assert.Equal(bReal, bRead);
 
-        byte u8 = 3;
+        const byte u8 = 3;
         buffer.Write(u8);
         byte u8Read = 0;
         Assert.True(buffer.Read(ref u8Read));
         Assert.Equal(u8, u8Read);
 
-        sbyte i8 = -5;
+        const sbyte i8 = -5;
         buffer.Write(i8);
         sbyte i8Read = 0;
         Assert.True(buffer.Read(ref i8Read));
         Assert.Equal(i8, i8Read);
 
-        ushort u16 = 10000;
+        const ushort u16 = 10000;
         buffer.Write(u16);
         ushort u16Read = 0;
         Assert.True(buffer.Read(ref u16Read));
         Assert.Equal(u16, u16Read);
 
-        short i16 = -5000;
+        const short i16 = -5000;
         buffer.Write(i16);
         short i16Read = 0;
         Assert.True(buffer.Read(ref i16Read));
         Assert.Equal(i16, i16Read);
 
-        uint ui32 = 7000000;
+        const uint ui32 = 7000000;
         buffer.Write(ui32);
         uint ui32Read = 0;
         Assert.True(buffer.Read(ref ui32Read));
         Assert.Equal(ui32, ui32Read);
 
-        int i32 = -3000000;
+        const int i32 = -3000000;
         buffer.Write(i32);
         int i32Read = 0;
         Assert.True(buffer.Read(ref i32Read));
         Assert.Equal(i32, i32Read);
 
-        ulong ui64 = 4000000000;
+        const ulong ui64 = 4000000000;
         buffer.Write(ui64);
         ulong ui64Read = 0;
         Assert.True(buffer.Read(ref ui64Read));
         Assert.Equal(ui64, ui64Read);
 
-        long i64 = -2000000000;
+        const long i64 = -2000000000;
         buffer.Write(i64);
         long i64Read = 0;
         Assert.True(buffer.Read(ref i64Read));
@@ -71,11 +71,11 @@ public class BinaryBufferTests
     {
         var buffer = new BinaryBuffer();
 
-        string str = "foo";
+        const string str = "foo";
         buffer.Write(str);
-        string str_read = string.Empty;
-        Assert.True(buffer.Read(ref str_read));
-        Assert.Equal(str, str_read);
+        string strRead = string.Empty;
+        Assert.True(buffer.Read(ref strRead));
+        Assert.Equal(str, strRead);
     }
 
     [Fact]
@@ -83,11 +83,11 @@ public class BinaryBufferTests
     {
         var buffer = new BinaryBuffer();
 
-        string str = "foo";
+        const string str = "foo";
         buffer.Write(str);
-        string str_read = string.Empty;
-        Assert.True(buffer.Read(ref str_read));
-        Assert.Equal(str, str_read);
+        string strRead = string.Empty;
+        Assert.True(buffer.Read(ref strRead));
+        Assert.Equal(str, strRead);
 
         byte[] u8 = { 3, 5, 7, 9, 11, 55, 75 };
         buffer.Write(u8);
