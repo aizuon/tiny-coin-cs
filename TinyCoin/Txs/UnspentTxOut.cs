@@ -7,7 +7,8 @@ using TinyCoin.BlockChain;
 
 namespace TinyCoin.Txs;
 
-public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquatable<UnspentTxOut>
+public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquatable<UnspentTxOut>,
+    ICloneable<UnspentTxOut>
 {
     private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(UnspentTxOut));
     public static readonly Dictionary<TxOutPoint, UnspentTxOut> Map = new Dictionary<TxOutPoint, UnspentTxOut>();
@@ -28,6 +29,11 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
         TxOutPoint = txOutPoint;
         IsCoinbase = isCoinbase;
         Height = height;
+    }
+
+    public UnspentTxOut Clone()
+    {
+        return Deserialize(Serialize());
     }
 
     public static UnspentTxOut Deserialize(BinaryBuffer buffer)
@@ -61,8 +67,8 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
     {
         var buffer = new BinaryBuffer();
 
-        buffer.Write(TxOut.Serialize().Buffer);
-        buffer.Write(TxOutPoint.Serialize().Buffer);
+        buffer.WriteRaw(TxOut.Serialize().Buffer);
+        buffer.WriteRaw(TxOutPoint.Serialize().Buffer);
         buffer.Write(IsCoinbase);
         buffer.Write(Height);
 
@@ -166,11 +172,6 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
         if (obj.GetType() != GetType())
             return false;
         return Equals((UnspentTxOut)obj);
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(Height, IsCoinbase, TxOut, TxOutPoint);
     }
 
     public static bool operator ==(UnspentTxOut lhs, UnspentTxOut rhs)

@@ -2,7 +2,7 @@
 
 namespace TinyCoin.Txs;
 
-public class TxOut : ISerializable, IDeserializable<TxOut>, IEquatable<TxOut>
+public class TxOut : ISerializable, IDeserializable<TxOut>, IEquatable<TxOut>, ICloneable<TxOut>
 {
     public string ToAddress = string.Empty;
     public ulong Value;
@@ -15,6 +15,11 @@ public class TxOut : ISerializable, IDeserializable<TxOut>, IEquatable<TxOut>
     {
         Value = value;
         ToAddress = toAddress;
+    }
+
+    public TxOut Clone()
+    {
+        return Deserialize(Serialize());
     }
 
     public static TxOut Deserialize(BinaryBuffer buffer)
@@ -56,11 +61,6 @@ public class TxOut : ISerializable, IDeserializable<TxOut>, IEquatable<TxOut>
         if (obj.GetType() != GetType())
             return false;
         return Equals((TxOut)obj);
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(ToAddress, Value);
     }
 
     public static bool operator ==(TxOut lhs, TxOut rhs)

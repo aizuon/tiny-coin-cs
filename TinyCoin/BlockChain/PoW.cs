@@ -1,6 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using System.Threading.Tasks;
 using Serilog;
 using Serilog.Core;
+using TinyCoin.Crypto;
 using TinyCoin.Txs;
 using UTXO = TinyCoin.Txs.UnspentTxOut;
 
@@ -9,7 +14,7 @@ namespace TinyCoin.BlockChain;
 public static class PoW
 {
     private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(PoW));
-    public static volatile bool MineInterrupt = false;
+    public static AtomicBool MineInterrupt = new AtomicBool(false);
 
     public static byte GetNextWorkRequired(string prevBlockHash)
     {
@@ -34,17 +39,108 @@ public static class PoW
         }
     }
 
-    // public static Block AssembleAndSolveBlock(string payCoinbaseToAddress, IList<Tx> txs = null)
-    // {
-    // }
+    public static Block AssembleAndSolveBlock(string payCoinbaseToAddress, IList<Tx> txs = null)
+    {
+        string prevBlockHash;
+        lock (Chain.Mutex)
+        {
+            prevBlockHash = Chain.ActiveChain.Count != 0 ? Chain.ActiveChain.Last().Id() : "";
+        }
 
-    // public static Block Mine(Block block)
-    // {
-    // }
+        var block = new Block(0, prevBlockHash, "", Utils.GetUnixTimestamp(),
+            GetNextWorkRequired(prevBlockHash), 0, txs);
 
-    // public void MineChunk(Block block, uint256_t target_hash, ulong start, ulong chunk_size, std::atomic_bool& found, std::atomic<uint64_t>& foundNonce, std::atomic<uint64_t>& hashCount)
-    // {
-    // }
+        if (block.Txs.Count == 0)
+            block = Mempool.SelectFromMempool(block);
+
+        ulong fees = CalculateFees(block);
+        var coinbase_tx = Tx.CreateCoinbase(payCoinbaseToAddress, GetBlockSubsidy() + fees,
+            Chain.ActiveChain.Count);
+        block.Txs.Insert(0, coinbase_tx);
+        block.MerkleHash = MerkleTree.GetRootOfTxs(block.Txs).Value;
+
+        if (block.Serialize().Buffer.Length > NetParams.MaxBlockSerializedSizeInBytes)
+            throw new Exception("Transactions specified create a block too large");
+
+        Logger.Information("Start mining block {} with {} fees", block.Id(), fees);
+
+        return Mine(block);
+    }
+
+    public static Block Mine(Block block)
+    {
+        if (MineInterrupt.Value)
+            MineInterrupt.Value = false;
+
+        var newBlock = block.Clone();
+        newBlock.Nonce = 0;
+        var targetHash = BigInteger.One << (byte.MaxValue - newBlock.Bits);
+        int numThreads = Environment.ProcessorCount - 3;
+        if (numThreads <= 0)
+            numThreads = 1;
+
+        ulong chunkSize = ulong.MaxValue / (ulong)numThreads;
+
+        var found = new AtomicBool(false);
+        var foundNonce = new AtomicULong(0);
+        var hashCount = new AtomicULong(0);
+
+        long start = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        var tasks = new List<Task>();
+
+        for (int i = 0; i < numThreads; i++)
+        {
+            ulong min = ulong.MinValue + chunkSize * (ulong)i;
+            tasks.Add(Task.Run(() => MineChunk(newBlock, targetHash, min, chunkSize, found, foundNonce, hashCount)));
+        }
+
+        Task.WaitAll(tasks.ToArray());
+
+        if (MineInterrupt.Value)
+        {
+            MineInterrupt.Value = false;
+
+            Logger.Information("Mining interrupted");
+
+            return null;
+        }
+
+        if (!found.Value)
+        {
+            Logger.Error("No nonce satisfies required bits");
+
+            return null;
+        }
+
+        newBlock.Nonce = foundNonce.Value;
+        long duration = Utils.GetUnixTimestamp() - start;
+        if (duration == 0)
+            duration = 1;
+        ulong khs = hashCount.Value / (ulong)duration / 1000;
+        Logger.Information("Block found => {} s, {} kH/s, {}, {}", duration, khs, newBlock.Id(), newBlock.Nonce);
+
+        return newBlock;
+    }
+
+    public static void MineChunk(Block block, BigInteger targetHash, ulong start, ulong chunkSize, AtomicBool found,
+        AtomicULong foundNonce, AtomicULong hashCount)
+    {
+        ulong i = 0;
+        while (!HashChecker.IsValid(
+                   Utils.ByteArrayToHexString(SHA256.DoubleHashBinary(block.Header(start + i).Buffer)),
+                   targetHash))
+        {
+            hashCount.Increment();
+
+            i++;
+            if (found.Value || i == chunkSize || MineInterrupt.Value)
+                return;
+        }
+
+        found.Value = true;
+        foundNonce.Value = start + i;
+    }
 
     // public static void MineForever(string payCoinbaseToAddress)
     // {

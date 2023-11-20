@@ -33,7 +33,7 @@ public static class Chain
 
     public static uint ActiveChainIdx = 0;
 
-    public static volatile bool InitialBlockDownloadComplete = false;
+    public static AtomicBool InitialBlockDownloadComplete = new AtomicBool(false);
 
     public static uint GetCurrentHeight()
     {
@@ -227,7 +227,7 @@ public static class Chain
 
             if ((!doingReorg && ReorgIfNecessary()) || chainIdx == ActiveChainIdx)
             {
-                PoW.MineInterrupt = true;
+                PoW.MineInterrupt.Value = true;
 
                 Logger.Information("Block accepted at height {} with {} txs", ActiveChain.Count - 1, block.Txs.Count);
             }

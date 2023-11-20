@@ -81,11 +81,11 @@ public class BinaryBuffer
             uint size = (uint)obj.Length;
             WriteSize(size);
 
-            uint length = size * sizeof(char);
+            uint length = size * sizeof(byte);
             GrowIfNeeded(length);
 
             foreach (char o in obj)
-                Write(o);
+                Write((byte)o);
         }
     }
 
@@ -173,7 +173,7 @@ public class BinaryBuffer
             if (!ReadSize(ref size))
                 return false;
 
-            uint length = size * sizeof(char);
+            uint length = size * sizeof(byte);
 
             uint finalOffset = ReadOffset + length;
             if (Buffer.Length < finalOffset)
@@ -182,10 +182,10 @@ public class BinaryBuffer
             var objBld = new StringBuilder((int)size);
             for (uint i = 0; i < size; i++)
             {
-                char c = '\0';
+                byte c = 0x00;
                 if (!Read(ref c))
                     return false;
-                objBld.Append(c);
+                objBld.Append((char)c);
             }
 
             obj = objBld.ToString();

@@ -10,7 +10,7 @@ using UTXO = TinyCoin.Txs.UnspentTxOut;
 
 namespace TinyCoin.Txs;
 
-public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>
+public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>, ICloneable<Tx>
 {
     private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(Tx));
 
@@ -27,6 +27,11 @@ public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>
         TxIns = txIns;
         TxOuts = txOuts;
         LockTime = lockTime;
+    }
+
+    public Tx Clone()
+    {
+        return Deserialize(Serialize());
     }
 
     public static Tx Deserialize(BinaryBuffer buffer)
@@ -190,11 +195,6 @@ public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>
         if (obj.GetType() != GetType())
             return false;
         return Equals((Tx)obj);
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(LockTime, TxIns, TxOuts);
     }
 
     public static bool operator ==(Tx lhs, Tx rhs)

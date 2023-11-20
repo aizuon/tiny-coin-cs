@@ -2,7 +2,7 @@
 
 namespace TinyCoin.Txs;
 
-public class TxIn : ISerializable, IDeserializable<TxIn>, IEquatable<TxIn>
+public class TxIn : ISerializable, IDeserializable<TxIn>, IEquatable<TxIn>, ICloneable<TxIn>
 {
     public int Sequence = -1;
     public TxOutPoint ToSpend;
@@ -19,6 +19,11 @@ public class TxIn : ISerializable, IDeserializable<TxIn>, IEquatable<TxIn>
         UnlockSig = unlockSig;
         UnlockPubKey = unlockPubKey;
         Sequence = sequence;
+    }
+
+    public TxIn Clone()
+    {
+        return Deserialize(Serialize());
     }
 
     public static TxIn Deserialize(BinaryBuffer buffer)
@@ -80,11 +85,6 @@ public class TxIn : ISerializable, IDeserializable<TxIn>, IEquatable<TxIn>
         if (obj.GetType() != GetType())
             return false;
         return Equals((TxIn)obj);
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(Sequence, ToSpend, UnlockPubKey, UnlockSig);
     }
 
     public static bool operator ==(TxIn lhs, TxIn rhs)

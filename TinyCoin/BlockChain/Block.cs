@@ -6,7 +6,7 @@ using TinyCoin.Txs;
 
 namespace TinyCoin.BlockChain;
 
-public class Block
+public class Block : ISerializable, IDeserializable<Block>, IEquatable<Block>, ICloneable<Block>
 {
     public byte Bits;
     public string MerkleHash;
@@ -27,29 +27,18 @@ public class Block
     public Block(ulong version, string prevBlockHash, string merkleHash, long timestamp,
         byte bits, ulong nonce, IList<Tx> txs)
     {
+        Version = version;
+        PrevBlockHash = prevBlockHash;
+        MerkleHash = merkleHash;
+        Timestamp = timestamp;
+        Bits = bits;
+        Nonce = nonce;
+        Txs = txs;
     }
 
-    public BinaryBuffer Header(ulong nonce = 0)
+    public Block Clone()
     {
-        var buffer = new BinaryBuffer();
-
-        buffer.Write(Version);
-
-        buffer.Write(PrevBlockHash);
-        buffer.Write(MerkleHash);
-
-        buffer.Write(Timestamp);
-
-        buffer.Write(Bits);
-
-        buffer.Write(nonce == 0 ? Nonce : nonce);
-
-        return buffer;
-    }
-
-    public string Id()
-    {
-        return Utils.ByteArrayToHexString(SHA256.DoubleHashBinary(Header().Buffer));
+        return Deserialize(Serialize());
     }
 
     public static Block Deserialize(BinaryBuffer buffer)
@@ -106,6 +95,29 @@ public class Block
         return buffer;
     }
 
+    public BinaryBuffer Header(ulong nonce = 0)
+    {
+        var buffer = new BinaryBuffer();
+
+        buffer.Write(Version);
+
+        buffer.Write(PrevBlockHash);
+        buffer.Write(MerkleHash);
+
+        buffer.Write(Timestamp);
+
+        buffer.Write(Bits);
+
+        buffer.Write(nonce == 0 ? Nonce : nonce);
+
+        return buffer;
+    }
+
+    public string Id()
+    {
+        return Utils.ByteArrayToHexString(SHA256.DoubleHashBinary(Header().Buffer));
+    }
+
     public override bool Equals(object obj)
     {
         if (ReferenceEquals(null, obj))
@@ -115,11 +127,6 @@ public class Block
         if (obj.GetType() != GetType())
             return false;
         return Equals((Block)obj);
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(Bits, MerkleHash, Nonce, PrevBlockHash, Timestamp, Txs, Version);
     }
 
     public static bool operator ==(Block lhs, Block rhs)
