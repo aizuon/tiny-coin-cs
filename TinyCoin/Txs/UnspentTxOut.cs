@@ -10,7 +10,9 @@ namespace TinyCoin.Txs;
 public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquatable<UnspentTxOut>,
     ICloneable<UnspentTxOut>
 {
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(UnspentTxOut));
+    private static readonly ILogger Logger =
+        Serilog.Log.ForContext(Constants.SourceContextPropertyName, nameof(UnspentTxOut));
+
     public static readonly Dictionary<TxOutPoint, UnspentTxOut> Map = new Dictionary<TxOutPoint, UnspentTxOut>();
     public static readonly object Mutex = new object();
 
@@ -79,7 +81,7 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
 
             var utxo = new UnspentTxOut(txOut, txOutPoint, isCoinbase, height);
 
-            Logger.Debug("Adding TxOutPoint {} to UTXO map", utxo.TxOutPoint.TxId);
+            Logger.Debug("Adding TxOutPoint {TransactionId} to UTXO map", utxo.TxOutPoint.TxId);
 
             Map[utxo.TxOutPoint] = utxo;
         }

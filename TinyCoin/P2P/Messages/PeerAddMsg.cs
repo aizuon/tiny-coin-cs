@@ -21,7 +21,7 @@ public class PeerAddMsg : IMsg<PeerAddMsg>
         NetClient.Connect(HostName, Port);
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.PeerAddMsg;
     }

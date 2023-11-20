@@ -23,7 +23,7 @@ public class SendActiveChainMsg : IMsg<SendActiveChainMsg>
         MsgCache.SendActiveChainMsg = this.Clone();
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.SendActiveChainMsg;
     }

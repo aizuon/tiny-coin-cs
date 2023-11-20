@@ -28,7 +28,7 @@ public class PeerHelloMsg : IMsg<PeerHelloMsg>
             }
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.PeerHelloMsg;
     }

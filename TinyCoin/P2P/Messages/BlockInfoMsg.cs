@@ -6,7 +6,9 @@ namespace TinyCoin.P2P.Messages;
 
 public class BlockInfoMsg : IMsg<BlockInfoMsg>
 {
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(BlockInfoMsg));
+    private static readonly ILogger Logger =
+        Serilog.Log.ForContext(Constants.SourceContextPropertyName, nameof(BlockInfoMsg));
+
     public Block Block;
 
     public BlockInfoMsg()
@@ -20,13 +22,13 @@ public class BlockInfoMsg : IMsg<BlockInfoMsg>
 
     public void Handle(Connection con)
     {
-        Logger.Debug("Received block {} from peer {}", Block.Id(), con.Channel.RemoteAddress);
+        Logger.Debug("Received block {BlockId} from peer {RemoteEndPoint}", Block.Id(), con.Channel.RemoteAddress);
 
         Chain.ConnectBlock(Block);
         Chain.SaveToDisk();
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.BlockInfoMsg;
     }

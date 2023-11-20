@@ -23,7 +23,7 @@ public class SendUTXOsMsg : IMsg<SendUTXOsMsg>
         MsgCache.SendUTXOsMsg = this.Clone();
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.SendUTXOsMsg;
     }

@@ -12,7 +12,7 @@ namespace TinyCoin.Txs;
 
 public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>, ICloneable<Tx>
 {
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(Tx));
+    private static readonly ILogger Logger = Serilog.Log.ForContext(Constants.SourceContextPropertyName, nameof(Tx));
 
     public long LockTime;
     public IList<TxIn> TxIns;

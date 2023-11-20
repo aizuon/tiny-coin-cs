@@ -2,7 +2,7 @@ namespace TinyCoin.P2P;
 
 public interface IHandleable
 {
-    void Handle(Connection con);
+    public void Handle(Connection con);
 
-    OpCode GetOpCode();
+    public static abstract OpCode GetOpCode();
 }

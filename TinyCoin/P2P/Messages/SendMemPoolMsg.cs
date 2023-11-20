@@ -21,7 +21,7 @@ public class SendMemPoolMsg : IMsg<SendMemPoolMsg>
         MsgCache.SendMemPoolMsg = this.Clone();
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.SendMemPoolMsg;
     }

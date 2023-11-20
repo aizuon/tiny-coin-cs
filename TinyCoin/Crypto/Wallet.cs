@@ -16,7 +16,10 @@ public static class Wallet
 {
     private const char PubKeyHashVersion = '1';
     private const string DefaultWalletPath = "wallet.dat";
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(Wallet));
+
+    private static readonly ILogger
+        Logger = Serilog.Log.ForContext(Constants.SourceContextPropertyName, nameof(Wallet));
+
     private static string _walletPath = DefaultWalletPath;
     private static bool _printedAddress;
 
@@ -54,7 +57,7 @@ public static class Wallet
         }
         else
         {
-            Logger.Information("Generating new wallet {}", walletPath);
+            Logger.Information("Generating new wallet {WalletPath}", walletPath);
 
             var keys = ECDSA.Generate();
             privKey = keys.Item1;
@@ -77,7 +80,7 @@ public static class Wallet
     {
         (_, _, string address) = GetWallet(walletPath);
 
-        Logger.Information("Wallet {} belongs to address {}", walletPath, address);
+        Logger.Information("Wallet {Wallet} belongs to address {Address}", walletPath, address);
     }
 
     public static (byte[], byte[], string) InitWallet(string walletPath)
@@ -90,7 +93,7 @@ public static class Wallet
         {
             _printedAddress = true;
 
-            Logger.Information("Your address is {}", address);
+            Logger.Information("Your address is {Address}", address);
         }
 
         return (privKey, pubKey, address);
@@ -117,7 +120,7 @@ public static class Wallet
         var tx = BuildTx_Miner(value, fee, address, privKey);
         if (tx == null)
             return null;
-        Logger.Information("Built transaction {}, adding to MemPool", tx.Id());
+        Logger.Information("Built transaction {TransactionId}, adding to MemPool", tx.Id());
         MemPool.AddTxToMemPool(tx);
         NetClient.SendMsgRandom(new TxInfoMsg(tx));
 
@@ -129,7 +132,7 @@ public static class Wallet
         var tx = BuildTx(value, fee, address, privKey);
         if (tx == null)
             return null;
-        Logger.Information("Built transaction {}, broadcasting", tx.Id());
+        Logger.Information("Built transaction {TransactionId}, broadcasting", tx.Id());
         if (!NetClient.SendMsgRandom(new TxInfoMsg(tx)))
             Logger.Error("No connection to send transaction");
 
@@ -257,20 +260,21 @@ public static class Wallet
         {
             case TxStatus.MemPool:
             {
-                Logger.Information("Transaction {} is in MemPool", txId);
+                Logger.Information("Transaction {TransactionId} is in MemPool", txId);
 
                 break;
             }
             case TxStatus.Mined:
             {
-                Logger.Information("Transaction {} is mined in {} at height {}", txId, response.BlockId,
+                Logger.Information("Transaction {TransactionId} is mined in {BlockId} at height {ChainHeight}", txId,
+                    response.BlockId,
                     response.BlockHeight);
 
                 break;
             }
             case TxStatus.NotFound:
             {
-                Logger.Information("Transaction {} not found", txId);
+                Logger.Information("Transaction {TransactionId} not found", txId);
 
                 break;
             }
@@ -300,7 +304,7 @@ public static class Wallet
     public static void PrintBalance(string address)
     {
         ulong balance = GetBalance(address);
-        Logger.Information("Address {} holds {} coins", address, balance);
+        Logger.Information("Address {Address} holds {Balance} coins", address, balance);
     }
 
     private static Tx BuildTxFromUTXOs(IList<UTXO> utxos, ulong value, ulong fee,
@@ -342,7 +346,7 @@ public static class Wallet
         var tx = new Tx(txIns, txOuts, 0);
         uint txSize = (uint)tx.Serialize().Buffer.Length;
         uint realFee = (uint)(totalFeeEst / txSize);
-        Logger.Information("Built transaction {} with {} coins/byte fee", tx.Id(), realFee);
+        Logger.Information("Built transaction {TransactionId} with {Fee} coins/byte fee", tx.Id(), realFee);
         return tx;
     }
 

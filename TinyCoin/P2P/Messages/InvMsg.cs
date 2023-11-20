@@ -8,7 +8,9 @@ namespace TinyCoin.P2P.Messages;
 
 public class InvMsg : IMsg<InvMsg>
 {
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(BlockInfoMsg));
+    private static readonly ILogger Logger =
+        Serilog.Log.ForContext(Constants.SourceContextPropertyName, nameof(BlockInfoMsg));
+
     public IList<Block> Blocks;
 
     public InvMsg()
@@ -23,7 +25,7 @@ public class InvMsg : IMsg<InvMsg>
 
     public void Handle(Connection con)
     {
-        Logger.Information("Received initial sync from {}", con.Channel.RemoteAddress.ToString());
+        Logger.Information("Received initial sync from {RemoteEndPoint}", con.Channel.RemoteAddress.ToString());
 
         var newBlocks = new List<Block>();
         foreach (var block in Blocks)
@@ -47,12 +49,12 @@ public class InvMsg : IMsg<InvMsg>
             Chain.ConnectBlock(newBlock);
 
         string newTipId = Chain.ActiveChain.Last().Id();
-        Logger.Information("Continuing initial sync from {}", newTipId);
+        Logger.Information("Continuing initial sync from {BlockId}", newTipId);
 
         NetClient.SendMsg(con, new GetBlockMsg(newTipId));
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.InvMsg;
     }

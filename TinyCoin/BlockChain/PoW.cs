@@ -16,7 +16,7 @@ namespace TinyCoin.BlockChain;
 
 public static class PoW
 {
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(PoW));
+    private static readonly ILogger Logger = Serilog.Log.ForContext(Constants.SourceContextPropertyName, nameof(PoW));
     public static AtomicBool MineInterrupt = new AtomicBool(false);
 
     public static byte GetNextWorkRequired(string prevBlockHash)
@@ -68,7 +68,7 @@ public static class PoW
         if (block.Serialize().Buffer.Length > NetParams.MaxBlockSerializedSizeInBytes)
             throw new Exception("Transactions specified create a block too large");
 
-        Logger.Information("Start mining block {} with {} fees", block.Id(), fees);
+        Logger.Information("Start mining block {BlockId} with {Fee} fees", block.Id(), fees);
 
         return Mine(block);
     }
@@ -91,7 +91,7 @@ public static class PoW
         var foundNonce = new AtomicULong(0);
         var hashCount = new AtomicULong(0);
 
-        long start = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        long start = Utils.GetUnixTimestamp();
 
         var tasks = new List<Task>();
 
@@ -124,7 +124,8 @@ public static class PoW
         if (duration == 0)
             duration = 1;
         ulong khs = hashCount.Value / (ulong)duration / 1000;
-        Logger.Information("Block found => {} s, {} kH/s, {}, {}", duration, khs, newBlock.Id(), newBlock.Nonce);
+        Logger.Information("Block found => {Time} s, {HashSpeed} kH/s, {BlockId}, {Nonce}", duration, khs,
+            newBlock.Id(), newBlock.Nonce);
 
         return newBlock;
     }

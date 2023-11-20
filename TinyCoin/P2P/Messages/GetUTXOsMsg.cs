@@ -7,7 +7,7 @@ public class GetUTXOsMsg : IMsg<GetUTXOsMsg>
         NetClient.SendMsg(con, new SendUTXOsMsg());
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.GetUTXOsMsg;
     }

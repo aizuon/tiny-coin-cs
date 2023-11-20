@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using DotNetty.Buffers;
+using DotNetty.Codecs;
 using DotNetty.Transport.Bootstrapping;
 using DotNetty.Transport.Channels;
 using DotNetty.Transport.Channels.Sockets;
@@ -14,7 +16,7 @@ namespace TinyCoin.P2P;
 
 public static class NetClient
 {
-    private const string Magic = "\xf9\xbe\xb4\xd9";
+    private static readonly byte[] Magic = { 0xf9, 0xbe, 0xb4, 0xd9 };
 
     public static readonly IList<(string, ushort)> InitialPeers = new List<(string, ushort)>
         { ("127.0.0.1", 9900), ("127.0.0.1", 9901), ("127.0.0.1", 9902), ("127.0.0.1", 9903), ("127.0.0.1", 9904) };
@@ -23,42 +25,72 @@ public static class NetClient
     public static IList<Connection> Connections = new List<Connection>();
     public static IList<Connection> MinerConnections = new List<Connection>();
     private static readonly MultithreadEventLoopGroup Group = new MultithreadEventLoopGroup(2);
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(NetClient));
+
+    private static readonly ILogger Logger =
+        Serilog.Log.ForContext(Constants.SourceContextPropertyName, nameof(NetClient));
+
+    private static readonly Dictionary<OpCode, Action<BinaryBuffer, IChannelHandlerContext>> MessageHandlers =
+        new Dictionary<OpCode, Action<BinaryBuffer, IChannelHandlerContext>>();
+
+    public static void Init()
+    {
+        var types = Assembly.GetExecutingAssembly().GetTypes()
+            .Where(t => t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IMsg<>)) &&
+                        t.GetConstructor(Type.EmptyTypes) != null);
+
+        foreach (var type in types)
+        {
+            var method = typeof(NetClient)
+                .GetMethod(nameof(HandleMessage), BindingFlags.Static | BindingFlags.NonPublic).MakeGenericMethod(type);
+            var opcode = (OpCode)type
+                .GetMethod(nameof(IHandleable.GetOpCode), BindingFlags.Static | BindingFlags.Public).Invoke(null, null);
+            MessageHandlers[opcode] =
+                (Action<BinaryBuffer, IChannelHandlerContext>)Delegate.CreateDelegate(
+                    typeof(Action<BinaryBuffer, IChannelHandlerContext>), method);
+        }
+    }
 
     public static void Stop()
     {
         lock (ConnectionsMutex)
         {
             foreach (var con in Connections)
-                con.Channel.CloseAsync();
+                con.Channel.CloseAsync().Wait();
 
             Connections.Clear();
             MinerConnections.Clear();
         }
 
-        Group.ShutdownGracefullyAsync();
+        Group.ShutdownGracefullyAsync().Wait();
     }
 
     public static void Connect(string address, int port)
     {
-        var bootstrap = new Bootstrap();
-        bootstrap
-            .Group(Group)
-            .Channel<TcpSocketChannel>()
-            .Handler(new ActionChannelInitializer<ISocketChannel>(channel =>
-            {
-                channel.Pipeline.AddLast(new NetClientHandler());
-            }));
-
-        var con = new Connection(bootstrap.ConnectAsync(new IPEndPoint(IPAddress.Parse(address), port)).GetAwaiter()
-            .GetResult());
-
-        lock (Connections)
+        try
         {
-            Connections.Add(con);
-        }
+            var bootstrap = new Bootstrap();
+            bootstrap
+                .Group(Group)
+                .Channel<TcpSocketChannel>()
+                .Handler(new ActionChannelInitializer<ISocketChannel>(channel =>
+                {
+                    channel.Pipeline.AddLast(new PacketDecoder(), new PacketEncoder(), new NetClientHandler());
+                }));
 
-        SendMsg(con, new PeerHelloMsg());
+            var con = new Connection(bootstrap.ConnectAsync(new IPEndPoint(IPAddress.Parse(address), port)).GetAwaiter()
+                .GetResult());
+
+            lock (Connections)
+            {
+                Connections.Add(con);
+            }
+
+            SendMsg(con, new PeerHelloMsg());
+        }
+        catch (ConnectException ex)
+        {
+            // Logger.Error(ex, "Unable to connect to {Address}:{Port}", address, port);
+        }
     }
 
     public static void ListenAsync(int port)
@@ -75,13 +107,13 @@ public static class NetClient
         bootstrap.BindAsync(port).Wait();
     }
 
-    public static void SendMsg<T>(Connection con, IMsg<T> msg)
+    public static void SendMsg<T>(Connection con, T msg) where T : IMsg<T>, new()
     {
         var buffer = PrepareSendBuffer(msg);
-        con.Channel.WriteAndFlushAsync(buffer);
+        con.Channel.WriteAndFlushAsync(buffer).Wait();
     }
 
-    public static bool SendMsgRandom<T>(IMsg<T> msg)
+    public static bool SendMsgRandom<T>(T msg) where T : IMsg<T>, new()
     {
         Connection con;
 
@@ -100,158 +132,146 @@ public static class NetClient
         return true;
     }
 
-    public static void BroadcastMsg<T>(IMsg<T> msg)
+    public static void BroadcastMsg<T>(T msg) where T : IMsg<T>, new()
     {
         var buffer = PrepareSendBuffer(msg);
 
         lock (Connections)
         {
             foreach (var con in MinerConnections)
-                con.Channel.WriteAndFlushAsync(buffer);
+                con.Channel.WriteAndFlushAsync(buffer).Wait();
         }
     }
 
-    private static IByteBuffer PrepareSendBuffer<T>(IMsg<T> msg)
+    private static IByteBuffer PrepareSendBuffer<T>(T msg) where T : IMsg<T>, new()
     {
-        var buffer = Unpooled.Buffer();
-
         byte[] serializedMsg = msg.Serialize().Buffer;
-        var opcode = msg.GetOpCode();
+        var opcode = T.GetOpCode();
 
-        var msgBuffer = new BinaryBuffer(serializedMsg);
-        msgBuffer.Write(opcode);
-        msgBuffer.WriteRaw(serializedMsg);
-        msgBuffer.WriteRaw(Magic);
+        var buffer = new BinaryBuffer(serializedMsg);
+        buffer.Write(opcode);
+        buffer.WriteRaw(serializedMsg);
 
-        buffer.WriteBytes(msgBuffer.Buffer);
-        return buffer;
+        return Unpooled.WrappedBuffer(buffer.Buffer);
     }
-}
 
-public class NetClientHandler : ChannelHandlerAdapter
-{
-    private static readonly ILogger Logger =
-        Log.ForContext(Constants.SourceContextPropertyName, nameof(NetClientHandler));
-
-    public override void ChannelActive(IChannelHandlerContext ctx)
+    private static void HandleMessage<T>(BinaryBuffer buffer, IChannelHandlerContext ctx) where T : IMsg<T>, new()
     {
-        base.ChannelActive(ctx);
-
-        var con = new Connection(ctx.Channel);
-        lock (NetClient.ConnectionsMutex)
+        var msg = T.Deserialize(buffer);
+        if (msg == null)
         {
-            NetClient.Connections.Add(con);
+            Logger.Error("Unable to deserialize opcode {OpCode}", T.GetOpCode());
+            return;
         }
 
-        NetClient.SendMsg(con, new PeerHelloMsg());
+        Connection con;
+        lock (ConnectionsMutex)
+        {
+            con = Connections.FirstOrDefault(con => con.Channel == ctx.Channel);
+        }
+
+        msg.Handle(con);
     }
 
-    public override void ChannelRead(IChannelHandlerContext ctx, object message)
+    public class PacketDecoder : ByteToMessageDecoder
     {
-        base.ChannelRead(ctx, message);
-
-        if (message is IByteBuffer buffer)
+        protected override void Decode(IChannelHandlerContext context, IByteBuffer input, List<object> output)
         {
-            byte[] arr = new byte[buffer.ReadableBytes];
-            buffer.ReadBytes(arr);
-            var binaryBuffer = new BinaryBuffer(arr);
-            var opCode = OpCode.PeerHelloMsg;
-            if (!binaryBuffer.Read(ref opCode))
-                return;
-            dynamic msgType = null;
-            switch (opCode)
+            while (input.IsReadable())
             {
-                case OpCode.BlockInfoMsg:
-                {
-                    msgType = typeof(BlockInfoMsg);
+                input.MarkReaderIndex();
 
-                    break;
-                }
-                case OpCode.GetActiveChainMsg:
+                int magicIndex = IndexOf(input, Magic);
+                if (magicIndex < 0)
                 {
-                    msgType = typeof(GetActiveChainMsg);
-
-                    break;
+                    input.ResetReaderIndex();
+                    return;
                 }
-                case OpCode.GetBlockMsg:
+
+                byte[] data = new byte[magicIndex - input.ReaderIndex];
+                input.ReadBytes(data);
+
+                input.SkipBytes(Magic.Length);
+
+                output.Add(new BinaryBuffer(data));
+            }
+        }
+
+        private static int IndexOf(IByteBuffer haystack, byte[] needle)
+        {
+            for (int i = haystack.ReaderIndex; i < haystack.WriterIndex; i++)
+            {
+                int haystackIndex = i;
+                int needleIndex;
+
+                for (needleIndex = 0; needleIndex < needle.Length; needleIndex++)
                 {
-                    msgType = typeof(GetBlockMsg);
-
-                    break;
+                    if (haystack.GetByte(haystackIndex) != needle[needleIndex])
+                        break;
+                    haystackIndex++;
+                    if (haystackIndex == haystack.WriterIndex && needleIndex != needle.Length - 1)
+                        return -1;
                 }
-                case OpCode.GetMemPoolMsg:
-                {
-                    msgType = typeof(GetMemPoolMsg);
 
-                    break;
-                }
-                case OpCode.GetUTXOsMsg:
-                {
-                    msgType = typeof(GetUTXOsMsg);
-
-                    break;
-                }
-                case OpCode.InvMsg:
-                {
-                    msgType = typeof(InvMsg);
-
-                    break;
-                }
-                case OpCode.PeerAddMsg:
-                {
-                    msgType = typeof(PeerAddMsg);
-
-                    break;
-                }
-                case OpCode.PeerHelloMsg:
-                {
-                    msgType = typeof(PeerHelloMsg);
-
-                    break;
-                }
-                case OpCode.SendActiveChainMsg:
-                {
-                    msgType = typeof(SendActiveChainMsg);
-
-                    break;
-                }
-                case OpCode.SendMemPoolMsg:
-                {
-                    msgType = typeof(SendMemPoolMsg);
-
-                    break;
-                }
-                case OpCode.SendUTXOsMsg:
-                {
-                    msgType = typeof(SendUTXOsMsg);
-
-                    break;
-                }
-                case OpCode.TxInfoMsg:
-                {
-                    msgType = typeof(TxInfoMsg);
-
-                    break;
-                }
+                if (needleIndex == needle.Length)
+                    return i;
             }
 
-            dynamic msg = msgType.Deserialize(binaryBuffer);
-            if (msg == null)
-            {
-                Logger.Error("Unable to deserialize opcode {}", opCode);
-
-                return;
-            }
-
-            var con = NetClient.Connections.FirstOrDefault(con => con.Channel == ctx.Channel);
-            msg.Handle(con);
+            return -1;
         }
     }
 
-    public override void ExceptionCaught(IChannelHandlerContext ctx, Exception exception)
+    public class PacketEncoder : MessageToByteEncoder<BinaryBuffer>
     {
-        base.ExceptionCaught(ctx, exception);
+        protected override void Encode(IChannelHandlerContext context, BinaryBuffer message, IByteBuffer output)
+        {
+            if (message == null)
+                return;
 
-        ctx.CloseAsync();
+            output.WriteBytes(message.Buffer);
+            output.WriteBytes(Magic);
+        }
+    }
+
+    public class NetClientHandler : ChannelHandlerAdapter
+    {
+        public override void ChannelActive(IChannelHandlerContext ctx)
+        {
+            var con = new Connection(ctx.Channel);
+            lock (ConnectionsMutex)
+            {
+                Connections.Add(con);
+            }
+
+            SendMsg(con, new PeerHelloMsg());
+        }
+
+        public override void ChannelRead(IChannelHandlerContext ctx, object message)
+        {
+            if (message is BinaryBuffer buffer)
+            {
+                var opCode = OpCode.PeerHelloMsg;
+                if (!buffer.Read(ref opCode))
+                    return;
+                if (MessageHandlers.TryGetValue(opCode, out var handler))
+                    handler(buffer, ctx);
+            }
+        }
+
+        public override void ExceptionCaught(IChannelHandlerContext ctx, Exception ex)
+        {
+            Logger.Error(ex, "Error while handling message from {RemoteAddress}", ctx.Channel.RemoteAddress);
+
+            ctx.CloseAsync().Wait();
+        }
+
+        public override void ChannelInactive(IChannelHandlerContext ctx)
+        {
+            lock (ConnectionsMutex)
+            {
+                var con = Connections.FirstOrDefault(con => con.Channel == ctx.Channel);
+                Connections.Remove(con);
+            }
+        }
     }
 }

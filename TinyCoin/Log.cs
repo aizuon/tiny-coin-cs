@@ -7,13 +7,13 @@ using Serilog.Events;
 
 namespace TinyCoin;
 
-public static class Logger
+public static class Log
 {
     public static void Init()
     {
-        Log.Logger = new LoggerConfiguration()
+        Serilog.Log.Logger = new LoggerConfiguration()
             .WriteTo.Async(log =>
-                log.File(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"log\log_.log"),
+                log.File(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "log/log_.log"),
                     outputTemplate:
                     "[{Timestamp:HH:mm:ss} {Level:u3}] |{SrcContext}| {Message}{NewLine}{Exception}",
                     rollingInterval: RollingInterval.Day,

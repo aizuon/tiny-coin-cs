@@ -8,7 +8,10 @@ namespace TinyCoin.P2P.Messages;
 public class GetBlockMsg : IMsg<GetBlockMsg>
 {
     private const uint ChunkSize = 50;
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(BlockInfoMsg));
+
+    private static readonly ILogger Logger =
+        Serilog.Log.ForContext(Constants.SourceContextPropertyName, nameof(BlockInfoMsg));
+
     public string FromBlockId;
 
     public GetBlockMsg()
@@ -23,7 +26,7 @@ public class GetBlockMsg : IMsg<GetBlockMsg>
 
     public void Handle(Connection con)
     {
-        Logger.Debug("Received GetBlockMsg from {}", con.Channel.RemoteAddress.ToString());
+        Logger.Debug("Received GetBlockMsg from {RemoteEndPoint}", con.Channel.RemoteAddress.ToString());
 
         (var block, long height) = Chain.LocateBlockInActiveChain(FromBlockId);
         if (height == -1)
@@ -41,11 +44,12 @@ public class GetBlockMsg : IMsg<GetBlockMsg>
                 blocks.Add(Chain.ActiveChain[(int)i]);
         }
 
-        Logger.Debug("Sending {} block(s) to {}", blocks.Count, con.Channel.RemoteAddress.ToString());
+        Logger.Debug("Sending {BlockCount} block(s) to {RemoteEndPoint}", blocks.Count,
+            con.Channel.RemoteAddress.ToString());
         NetClient.SendMsg(con, new InvMsg(blocks));
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.GetBlockMsg;
     }

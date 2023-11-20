@@ -17,7 +17,7 @@ namespace TinyCoin.BlockChain;
 public static class Chain
 {
     private const string ChainPath = "chain.dat";
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(Chain));
+    private static readonly ILogger Logger = Serilog.Log.ForContext(Constants.SourceContextPropertyName, nameof(Chain));
 
     public static readonly TxIn GenesisTxIn = new TxIn(null, Array.Empty<byte>(), Array.Empty<byte>(), -1);
     public static readonly TxOut GenesisTxOut = new TxOut(5000000000, "143UVyz7ooiAv1pMqbwPPpnH4BV9ifJGFF");
@@ -93,9 +93,8 @@ public static class Chain
                 }
                 catch (TxValidationException ex)
                 {
-                    Logger.Error(ex, "");
-
-                    Logger.Error("Transaction {} in block {} failed validation", txs[(int)i].Id(), block.Id());
+                    Logger.Error(ex, "Transaction {TransactionId} in block {BlockId} failed validation",
+                        txs[(int)i].Id(), block.Id());
 
                     throw new BlockValidationException($"Transaction {txs[(int)i].Id()} invalid");
                 }
@@ -103,7 +102,7 @@ public static class Chain
             if (MerkleTree.GetRootOfTxs(txs).Value != block.MerkleHash)
                 throw new BlockValidationException("Merkle hash invalid");
 
-            if (block.Timestamp <= GetMedianTimePast(11))
+            if (block.Timestamp < GetMedianTimePast(11))
                 throw new BlockValidationException("Timestamp too old");
 
             uint prevBlockChainIdx;
@@ -143,7 +142,7 @@ public static class Chain
                 }
                 catch (TxValidationException ex)
                 {
-                    Logger.Error(ex, "");
+                    Logger.Error(ex, "Transaction {TransactionId} failed validation", nonCoinbaseTx.Id());
 
                     throw new BlockValidationException($"Transaction {nonCoinbaseTx.Id()} failed to validate");
                 }
@@ -173,7 +172,7 @@ public static class Chain
 
             if (locatedBlock != null)
             {
-                Logger.Information("Ignore already seen block {}", blockId);
+                Logger.Information("Ignore already seen block {BlockId}", blockId);
 
                 return -1;
             }
@@ -185,12 +184,11 @@ public static class Chain
             }
             catch (BlockValidationException ex)
             {
-                Logger.Error(ex, "");
+                Logger.Error(ex, "Block {BlockId} failed validation", blockId);
 
-                Logger.Error("Block {} failed validation", blockId);
                 if (ex.ToOrphan != null)
                 {
-                    Logger.Information("Found orphan block {}", blockId);
+                    Logger.Information("Found orphan block {BlockId}", blockId);
 
                     OrphanBlocks.Add(ex.ToOrphan);
                 }
@@ -200,12 +198,13 @@ public static class Chain
 
             if (chainIdx != ActiveChainIdx && SideBranches.Count < chainIdx)
             {
-                Logger.Information("Creating a new side branch with idx {} for block {}", chainIdx, blockId);
+                Logger.Information("Creating a new side branch with idx {ChainIdx} for block {BlockId}", chainIdx,
+                    blockId);
 
                 SideBranches.Add(new List<Block>());
             }
 
-            Logger.Information("Connecting block {} to chain {}", blockId, chainIdx);
+            Logger.Information("Connecting block {BlockId} to chain {ChainIdx}", blockId, chainIdx);
 
             var chain = chainIdx == ActiveChainIdx ? ActiveChain : SideBranches[(int)(chainIdx - 1)];
             chain.Add(block);
@@ -232,7 +231,8 @@ public static class Chain
             {
                 PoW.MineInterrupt.Value = true;
 
-                Logger.Information("Block accepted at height {} with {} txs", ActiveChain.Count - 1, block.Txs.Count);
+                Logger.Information("Block accepted at height {BlockId} with {TransactionCount} txs",
+                    ActiveChain.Count - 1, block.Txs.Count);
             }
 
             NetClient.SendMsgRandom(new BlockInfoMsg(block));
@@ -275,7 +275,7 @@ public static class Chain
 
             ActiveChain.RemoveAt(ActiveChain.Count - 1);
 
-            Logger.Information("Block {} disconnected", blockId);
+            Logger.Information("Block {BlockId} disconnected", blockId);
 
             return back;
         }
@@ -312,7 +312,9 @@ public static class Chain
                 uint branchHeight = (uint)(chain.Count + forkHeight);
                 if (branchHeight > GetCurrentHeight())
                 {
-                    Logger.Information("Attempting reorg of idx {} to active chain, new height of {} vs. {}", branchIdx,
+                    Logger.Information(
+                        "Attempting reorg of idx {ChainIdx} to active chain, new height of {ChainHeight} vs. {ForkHeight}",
+                        branchIdx,
                         branchHeight,
                         forkHeight);
 
@@ -347,7 +349,7 @@ public static class Chain
             SideBranches.RemoveAt((int)(branchIdx - 1));
             SideBranches.Add(oldActiveChain);
 
-            Logger.Information("Chain reorganized, new height {} with tip {}", ActiveChain.Count,
+            Logger.Information("Chain reorganized, new height {ChainHeight} with tip {BlockId}", ActiveChain.Count,
                 ActiveChain.Last().Id());
 
             return true;
@@ -359,7 +361,7 @@ public static class Chain
     {
         lock (Mutex)
         {
-            Logger.Error("Reorg of idx {} to active chain failed", branchIdx);
+            Logger.Error("Reorg of idx {ChainIdx} to active chain failed", branchIdx);
 
             DisconnectToFork(forkBlock);
 
@@ -445,7 +447,7 @@ public static class Chain
     {
         lock (Mutex)
         {
-            Logger.Information("Saving chain with {} blocks", ActiveChain.Count);
+            Logger.Information("Saving chain with {BlockCount} blocks", ActiveChain.Count);
 
             // TODO: append from previously saved height
             using (var chainOut = new FileStream(ChainPath, FileMode.Create, FileAccess.Write))
@@ -501,7 +503,7 @@ public static class Chain
                                 return false;
                             }
 
-                        Logger.Information("Loaded chain with {} blocks", ActiveChain.Count);
+                        Logger.Information("Loaded chain with {BlockCount} blocks", ActiveChain.Count);
                         return true;
                     }
                 }

@@ -11,7 +11,9 @@ namespace TinyCoin.BlockChain;
 
 public static class MemPool
 {
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(MemPool));
+    private static readonly ILogger Logger =
+        Serilog.Log.ForContext(Constants.SourceContextPropertyName, nameof(MemPool));
+
     public static Dictionary<string, Tx> Map = new Dictionary<string, Tx>();
     public static List<Tx> OrphanedTxs = new List<Tx>();
     public static readonly object Mutex = new object();
@@ -26,7 +28,7 @@ public static class MemPool
             var tx = Map[txOutPoint.TxId];
             if (tx.TxOuts.Count - 1 < txOutPoint.TxOutIdx)
             {
-                Logger.Error("Unable to find UTXO in MemPool for {}", txOutPoint.TxId);
+                Logger.Error("Unable to find UTXO in MemPool for {TransactionId}", txOutPoint.TxId);
                 return null;
             }
 
@@ -59,7 +61,7 @@ public static class MemPool
             string txId = tx.Id();
             if (Map.ContainsKey(txId))
             {
-                Logger.Information("Transaction {} already seen", txId);
+                Logger.Information("Transaction {TransactionId} already seen", txId);
                 return;
             }
 
@@ -69,21 +71,21 @@ public static class MemPool
             }
             catch (TxValidationException ex)
             {
-                Logger.Error(ex, "Transaction validation failed for {}", txId);
+                Logger.Error(ex, "Transaction validation failed for {TransactionId}", txId);
 
                 if (ex.ToOrphan != null)
                 {
-                    Logger.Information("Transaction {} submitted as orphan", ex.ToOrphan.Id());
+                    Logger.Information("Transaction {TransactionId} submitted as orphan", ex.ToOrphan.Id());
                     OrphanedTxs.Add(ex.ToOrphan);
                     return;
                 }
 
-                Logger.Error("Transaction {} rejected", txId);
+                Logger.Error("Transaction {TransactionId} rejected", txId);
                 return;
             }
 
             Map[txId] = tx;
-            Logger.Debug("Transaction {} added to MemPool", txId);
+            Logger.Debug("Transaction {TransactionId} added to MemPool", txId);
 
             NetClient.SendMsgRandom(new TxInfoMsg(tx));
         }
@@ -114,7 +116,7 @@ public static class MemPool
                 var inMemPool = Find_UTXO_InMemPool(toSpend);
                 if (inMemPool == null)
                 {
-                    Logger.Error("Unable to find UTXO for {}", txIn.ToSpend.TxId);
+                    Logger.Error("Unable to find UTXO for {TransactionId}", txIn.ToSpend.TxId);
                     return null;
                 }
 
@@ -133,7 +135,7 @@ public static class MemPool
 
             if (CheckBlockSize(newBlock))
             {
-                Logger.Debug("Added transaction {} to block {}", txId, block.Id());
+                Logger.Debug("Added transaction {TransactionId} to block {BlockId}", txId, block.Id());
                 addedToBlock.Add(txId);
                 return newBlock;
             }

@@ -7,7 +7,7 @@ public class GetActiveChainMsg : IMsg<GetActiveChainMsg>
         NetClient.SendMsg(con, new SendActiveChainMsg());
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.GetActiveChainMsg;
     }

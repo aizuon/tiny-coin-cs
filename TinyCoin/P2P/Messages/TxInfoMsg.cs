@@ -7,7 +7,9 @@ namespace TinyCoin.P2P.Messages;
 
 public class TxInfoMsg : IMsg<TxInfoMsg>
 {
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(TxInfoMsg));
+    private static readonly ILogger Logger =
+        Serilog.Log.ForContext(Constants.SourceContextPropertyName, nameof(TxInfoMsg));
+
     public Tx Tx;
 
     public TxInfoMsg()
@@ -21,12 +23,13 @@ public class TxInfoMsg : IMsg<TxInfoMsg>
 
     public void Handle(Connection con)
     {
-        Logger.Debug("Received transaction {} from peer {}", Tx.Id(), con.Channel.RemoteAddress.ToString());
+        Logger.Debug("Received transaction {TransactionId} from peer {Address}", Tx.Id(),
+            con.Channel.RemoteAddress.ToString());
 
         MemPool.AddTxToMemPool(Tx);
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.TxInfoMsg;
     }

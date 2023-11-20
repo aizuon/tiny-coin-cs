@@ -7,7 +7,7 @@ public class GetMemPoolMsg : IMsg<GetMemPoolMsg>
         NetClient.SendMsg(con, new SendMemPoolMsg());
     }
 
-    public OpCode GetOpCode()
+    public static OpCode GetOpCode()
     {
         return OpCode.GetMemPoolMsg;
     }
