@@ -9,7 +9,7 @@ public class SendActiveChainMsg : IMsg<SendActiveChainMsg>
 
     public SendActiveChainMsg()
     {
-        ActiveChain = new List<Block>();
+        ActiveChain = Chain.ActiveChain;
     }
 
     public SendActiveChainMsg(IList<Block> activeChain)
@@ -34,8 +34,8 @@ public class SendActiveChainMsg : IMsg<SendActiveChainMsg>
 
         lock (Chain.Mutex)
         {
-            buffer.WriteSize((uint)Chain.ActiveChain.Count);
-            foreach (var block in Chain.ActiveChain)
+            buffer.WriteSize((uint)ActiveChain.Count);
+            foreach (var block in ActiveChain)
                 buffer.WriteRaw(block.Serialize().Buffer);
         }
 

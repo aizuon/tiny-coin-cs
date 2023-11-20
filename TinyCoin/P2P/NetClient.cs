@@ -74,7 +74,10 @@ public static class NetClient
                 .Channel<TcpSocketChannel>()
                 .Handler(new ActionChannelInitializer<ISocketChannel>(channel =>
                 {
-                    channel.Pipeline.AddLast(new PacketDecoder(), new PacketEncoder(), new NetClientHandler());
+                    var pipeline = channel.Pipeline;
+                    pipeline.AddLast(new PacketDecoder());
+                    pipeline.AddLast(new PacketEncoder());
+                    pipeline.AddLast(new NetClientHandler());
                 }));
 
             var con = new Connection(bootstrap.ConnectAsync(new IPEndPoint(IPAddress.Parse(address), port)).GetAwaiter()
@@ -84,8 +87,6 @@ public static class NetClient
             {
                 Connections.Add(con);
             }
-
-            SendMsg(con, new PeerHelloMsg());
         }
         catch (ConnectException ex)
         {
@@ -101,7 +102,10 @@ public static class NetClient
             .Channel<TcpServerSocketChannel>()
             .ChildHandler(new ActionChannelInitializer<ISocketChannel>(channel =>
             {
-                channel.Pipeline.AddLast(new NetClientHandler());
+                var pipeline = channel.Pipeline;
+                pipeline.AddLast(new PacketDecoder());
+                pipeline.AddLast(new PacketEncoder());
+                pipeline.AddLast(new NetClientHandler());
             }));
 
         bootstrap.BindAsync(port).Wait();
@@ -143,16 +147,16 @@ public static class NetClient
         }
     }
 
-    private static IByteBuffer PrepareSendBuffer<T>(T msg) where T : IMsg<T>, new()
+    private static BinaryBuffer PrepareSendBuffer<T>(T msg) where T : IMsg<T>, new()
     {
         byte[] serializedMsg = msg.Serialize().Buffer;
         var opcode = T.GetOpCode();
 
-        var buffer = new BinaryBuffer(serializedMsg);
+        var buffer = new BinaryBuffer();
         buffer.Write(opcode);
         buffer.WriteRaw(serializedMsg);
 
-        return Unpooled.WrappedBuffer(buffer.Buffer);
+        return buffer;
     }
 
     private static void HandleMessage<T>(BinaryBuffer buffer, IChannelHandlerContext ctx) where T : IMsg<T>, new()

@@ -10,7 +10,7 @@ public class SendUTXOsMsg : IMsg<SendUTXOsMsg>
 
     public SendUTXOsMsg()
     {
-        UTXOs = new Dictionary<TxOutPoint, UTXO>();
+        UTXOs = UTXO.Map;
     }
 
     public SendUTXOsMsg(IDictionary<TxOutPoint, UTXO> utxos)
@@ -34,8 +34,8 @@ public class SendUTXOsMsg : IMsg<SendUTXOsMsg>
 
         lock (UTXO.Mutex)
         {
-            buffer.WriteSize((uint)UTXO.Map.Count);
-            foreach (var (key, value) in UTXO.Map)
+            buffer.WriteSize((uint)UTXOs.Count);
+            foreach (var (key, value) in UTXOs)
             {
                 buffer.WriteRaw(key.Serialize().Buffer);
                 buffer.WriteRaw(value.Serialize().Buffer);

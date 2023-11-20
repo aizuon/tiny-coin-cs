@@ -8,6 +8,7 @@ public class PeerHelloMsg : IMsg<PeerHelloMsg>
 
     public PeerHelloMsg()
     {
+        NodeType = NodeConfig.NodeType;
     }
 
     public PeerHelloMsg(NodeType type)

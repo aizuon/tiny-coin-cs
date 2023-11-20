@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace TinyCoin.P2P.Messages;
 
@@ -8,7 +9,7 @@ public class SendMemPoolMsg : IMsg<SendMemPoolMsg>
 
     public SendMemPoolMsg()
     {
-        MemPool = new List<string>();
+        MemPool = BlockChain.MemPool.Map.Keys.ToList();
     }
 
     public SendMemPoolMsg(IList<string> memPool)
@@ -32,8 +33,8 @@ public class SendMemPoolMsg : IMsg<SendMemPoolMsg>
 
         lock (BlockChain.MemPool.Mutex)
         {
-            buffer.WriteSize((uint)BlockChain.MemPool.Map.Count);
-            foreach (string key in BlockChain.MemPool.Map.Keys)
+            buffer.WriteSize((uint)MemPool.Count);
+            foreach (string key in MemPool)
                 buffer.Write(key);
         }
 
