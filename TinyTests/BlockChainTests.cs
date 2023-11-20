@@ -384,47 +384,45 @@ public class BlockChainTests
         Assert.NotNull(mapIt2);
     }
 
-    // TEST(BlockChainTest_LongRunning, MinerTransaction)
-    // {
-    // 	Chain.ActiveChain.Clear();
-    // 	Chain.SideBranches.Clear();
-    // 	Mempool.Map.Clear();
-    // 	UTXO.Map.Clear();
-    //
-    // 	var [miner_priv_key, miner_pub_key, miner_address] = Wallet.InitWallet("miner.dat");
-    // 	var [receiver_priv_key, receiver_pub_key, receiver_address] = Wallet.InitWallet("receiver.dat");
-    //
-    // 	var first_block = PoW.AssembleAndSolveBlock(miner_address);
-    // 	if (first_block == nullptr)
-    // 		FAIL();
-    // 	Chain.ConnectBlock(first_block);
-    // 	Chain.SaveToDisk();
-    //
-    // 	for (int i = 0; i < NetParams.COINBASE_MATURITY + 1; i++)
-    // 	{
-    // 		var maturity_blocks = PoW.AssembleAndSolveBlock(miner_address);
-    // 		if (maturity_blocks == nullptr)
-    // 			FAIL();
-    // 		Chain.ConnectBlock(maturity_blocks);
-    // 		Chain.SaveToDisk();
-    // 	}
-    //
-    // 	ASSERT_GT(Wallet.GetBalance_Miner(miner_address), 0);
-    // 	var tx = Wallet.SendValue_Miner(first_block.Txs.front().TxOuts.front().Value / 2, 100, receiver_address,
-    // 		miner_priv_key);
-    // 	ASSERT_TRUE(tx != nullptr);
-    // 	Assert.Equal(Wallet.GetTxStatus_Miner(tx.Id()).Status, TxStatus.Mempool);
-    //
-    // 	var post_tx_block = PoW.AssembleAndSolveBlock(miner_address);
-    // 	if (post_tx_block == nullptr)
-    // 		FAIL();
-    // 	Chain.ConnectBlock(post_tx_block);
-    // 	Chain.SaveToDisk();
-    //
-    // 	var mined_tx_status = Wallet.GetTxStatus_Miner(tx.Id());
-    // 	Assert.Equal(mined_tx_status.Status, TxStatus.Mined);
-    // 	Assert.Equal(mined_tx_status.BlockId, post_tx_block.Id());
-    // 	ASSERT_GT(Wallet.GetBalance_Miner(receiver_address), 0);
-    // }
+    [Fact]
+    public void MinerTransaction()
+    {
+        Chain.ActiveChain.Clear();
+        Chain.SideBranches.Clear();
+        Mempool.Map.Clear();
+        UTXO.Map.Clear();
+
+        (byte[] minerPrivKey, _, string minerAddress) = Wallet.InitWallet("miner.dat");
+        (_, _, string receiverAddress) = Wallet.InitWallet("receiver.dat");
+
+        var firstBlock = PoW.AssembleAndSolveBlock(minerAddress);
+        Assert.NotNull(firstBlock);
+        Chain.ConnectBlock(firstBlock);
+        Chain.SaveToDisk();
+
+        for (int i = 0; i < NetParams.CoinbaseMaturity + 1; i++)
+        {
+            var maturityBlocks = PoW.AssembleAndSolveBlock(minerAddress);
+            Assert.NotNull(maturityBlocks);
+            Chain.ConnectBlock(maturityBlocks);
+            Chain.SaveToDisk();
+        }
+
+        Assert.True(Wallet.GetBalance_Miner(minerAddress) > 0);
+        var tx = Wallet.SendValue_Miner(firstBlock.Txs.First().TxOuts.First().Value / 2, 100, receiverAddress,
+            minerPrivKey);
+        Assert.NotNull(tx);
+        Assert.Equal(TxStatus.Mempool, Wallet.GetTxStatus_Miner(tx.Id()).Status);
+
+        var postTxBlock = PoW.AssembleAndSolveBlock(minerAddress);
+        Assert.NotNull(postTxBlock);
+        Chain.ConnectBlock(postTxBlock);
+        Chain.SaveToDisk();
+
+        var minedTxStatus = Wallet.GetTxStatus_Miner(tx.Id());
+        Assert.Equal(TxStatus.Mined, minedTxStatus.Status);
+        Assert.Equal(minedTxStatus.BlockId, postTxBlock.Id());
+        Assert.True(Wallet.GetBalance_Miner(receiverAddress) > 0);
+    }
 #endif
 }

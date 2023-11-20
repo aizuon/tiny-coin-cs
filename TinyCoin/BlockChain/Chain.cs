@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using Serilog;
@@ -438,11 +439,73 @@ public static class Chain
         return FindTxOutForTxIn(txIn, ActiveChain);
     }
 
-    // public static void SaveToDisk()
-    // {
-    // }
+    public static void SaveToDisk()
+    {
+        lock (Mutex)
+        {
+            Logger.Information("Saving chain with {} blocks", ActiveChain.Count);
 
-    // public static void LoadFromDisk()
-    // {
-    // }
+            // TODO: append from previously saved height
+            using (var chainOut = new FileStream(ChainPath, FileMode.Create, FileAccess.Write))
+            {
+                using (var writer = new BinaryWriter(chainOut))
+                {
+                    writer.Write(ActiveChain.Count - 1);
+                    for (int height = 1; height < ActiveChain.Count; height++)
+                    {
+                        byte[] serializedData = ActiveChain[height].Serialize().Buffer;
+                        writer.Write((uint)serializedData.Length);
+                        writer.Write(serializedData);
+                    }
+                }
+            }
+        }
+    }
+
+    public static bool LoadFromDisk()
+    {
+        lock (Mutex)
+        {
+            if (File.Exists(ChainPath))
+                using (var chainIn = new FileStream(ChainPath, FileMode.Open, FileAccess.Read))
+                {
+                    using (var reader = new BinaryReader(chainIn))
+                    {
+                        int blockCount = reader.ReadInt32();
+                        var loadedChain = new List<Block>();
+                        for (int i = 0; i < blockCount; i++)
+                        {
+                            uint blockSize = reader.ReadUInt32();
+                            var block = Block.Deserialize(new BinaryBuffer(reader.ReadBytes((int)blockSize)));
+                            if (block == null)
+                            {
+                                Logger.Error("Load chain failed, starting from genesis");
+                                return false;
+                            }
+
+                            loadedChain.Add(block);
+                        }
+
+                        foreach (var block in loadedChain)
+                            if (ConnectBlock(block) != ActiveChainIdx)
+                            {
+                                ActiveChain.Clear();
+                                ActiveChain.Add(GenesisBlock);
+                                SideBranches.Clear();
+                                UTXO.Map.Clear();
+                                Mempool.Map.Clear();
+
+                                Logger.Error("Load chain failed, starting from genesis");
+                                return false;
+                            }
+
+                        Logger.Information("Loaded chain with {} blocks", ActiveChain.Count);
+                        return true;
+                    }
+                }
+
+            Logger.Error("Load chain failed, starting from genesis");
+            return false;
+        }
+    }
 }

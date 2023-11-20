@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Serilog;
 using Serilog.Core;
@@ -12,7 +13,10 @@ namespace TinyCoin.Crypto;
 public static class Wallet
 {
     private const char PubKeyHashVersion = '1';
+    private const string DefaultWalletPath = "wallet.dat";
     private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(Wallet));
+    private static string _walletPath = DefaultWalletPath;
+    private static bool _printedAddress;
 
     public static string PubKeyToAddress(byte[] pubKey)
     {
@@ -28,66 +32,72 @@ public static class Wallet
         return $"{PubKeyHashVersion}{address}";
     }
 
-    // std::tuple<std::vector<uint8_t>, std::vector<uint8_t>, std::string> Wallet::GetWallet(const std::string& wallet_path)
-    // {
-    // 	std::vector<uint8_t> priv_key;
-    // 	std::vector<uint8_t> pub_key;
-    // 	std::string address;
-    //
-    // 	std::ifstream wallet_in(wallet_path, std::ios::binary);
-    // 	if (wallet_in.good())
-    // 	{
-    // 		priv_key = std::vector<uint8_t>(std::istreambuf_iterator(wallet_in), {});
-    // 		pub_key = ECDSA::GetPubKeyFromPrivKey(priv_key);
-    // 		address = PubKeyToAddress(pub_key);
-    // 		wallet_in.close();
-    // 	}
-    // 	else
-    // 	{
-    // 		LOG_INFO("Generating new wallet {}", wallet_path);
-    //
-    // 		auto [privKey2, pubKey2] = ECDSA::Generate();
-    // 		priv_key = privKey2;
-    // 		pub_key = pubKey2;
-    // 		address = PubKeyToAddress(pub_key);
-    //
-    // 		std::ofstream wallet_out(wallet_path, std::ios::binary);
-    // 		wallet_out.write(reinterpret_cast<const char*>(priv_key.data()), priv_key.size());
-    // 		wallet_out.flush();
-    // 		wallet_out.close();
-    // 	}
-    //
-    // 	return { priv_key, pub_key, address };
-    // }
-    //
-    // void Wallet::PrintWalletAddress(const std::string& wallet_path)
-    // {
-    // 	const auto [priv_key, pub_key, address] = GetWallet(wallet_path);
-    //
-    // 	LOG_INFO("Wallet {} belongs to address {}", wallet_path, address);
-    // }
-    //
-    // std::tuple<std::vector<uint8_t>, std::vector<uint8_t>, std::string> Wallet::InitWallet(const std::string& wallet_path)
-    // {
-    // 	WalletPath = wallet_path;
-    //
-    // 	const auto [priv_key, pub_key, address] = GetWallet(WalletPath);
-    //
-    // 	static bool printed_address = false;
-    // 	if (!printed_address)
-    // 	{
-    // 		printed_address = true;
-    //
-    // 		LOG_INFO("Your address is {}", address);
-    // 	}
-    //
-    // 	return { priv_key, pub_key, address };
-    // }
-    //
-    // std::tuple<std::vector<uint8_t>, std::vector<uint8_t>, std::string> Wallet::InitWallet()
-    // {
-    // 	return InitWallet(WalletPath);
-    // }
+    public static (byte[], byte[], string) GetWallet(string walletPath)
+    {
+        byte[] privKey;
+        byte[] pubKey;
+        string address;
+
+        if (File.Exists(walletPath))
+        {
+            using (var walletIn = new FileStream(walletPath, FileMode.Open, FileAccess.Read))
+            {
+                using (var reader = new BinaryReader(walletIn))
+                {
+                    privKey = reader.ReadBytes((int)reader.BaseStream.Length);
+                    pubKey = ECDSA.GetPubKeyFromPrivKey(privKey);
+                    address = PubKeyToAddress(pubKey);
+                }
+            }
+        }
+        else
+        {
+            Logger.Information("Generating new wallet {}", walletPath);
+
+            var keys = ECDSA.Generate();
+            privKey = keys.Item1;
+            pubKey = keys.Item2;
+            address = PubKeyToAddress(pubKey);
+
+            using (var walletOut = new FileStream(walletPath, FileMode.Create, FileAccess.Write))
+            {
+                using (var writer = new BinaryWriter(walletOut))
+                {
+                    writer.Write(privKey);
+                }
+            }
+        }
+
+        return (privKey, pubKey, address);
+    }
+
+    public static void PrintWalletAddress(string walletPath)
+    {
+        (_, _, string address) = GetWallet(walletPath);
+
+        Logger.Information("Wallet {} belongs to address {}", walletPath, address);
+    }
+
+    public static (byte[], byte[], string) InitWallet(string walletPath)
+    {
+        _walletPath = walletPath;
+
+        (byte[] privKey, byte[] pubKey, string address) = GetWallet(_walletPath);
+
+        if (!_printedAddress)
+        {
+            _printedAddress = true;
+
+            Logger.Information("Your address is {}", address);
+        }
+
+        return (privKey, pubKey, address);
+    }
+
+    public static (byte[], byte[], string) InitWallet()
+    {
+        return InitWallet(_walletPath);
+    }
 
     public static TxIn BuildTxIn(byte[] privKey, TxOutPoint txOutPoint, IList<TxOut> txOuts)
     {
@@ -100,8 +110,7 @@ public static class Wallet
         return new TxIn(txOutPoint, unlockSig, pubKey, sequence);
     }
 
-    public static Tx SendValue_Miner(ulong value, ulong fee, string address,
-        byte[] privKey)
+    public static Tx SendValue_Miner(ulong value, ulong fee, string address, byte[] privKey)
     {
         var tx = BuildTx_Miner(value, fee, address, privKey);
         if (tx == null)
@@ -113,196 +122,185 @@ public static class Wallet
         return tx;
     }
 
-    // std::shared_ptr<Tx> Wallet::SendValue(uint64_t value, uint64_t fee, const std::string& address,
-    // 	const std::vector<uint8_t>& priv_key)
+    // public static Tx SendValue(ulong value, ulong fee, string address, byte[] privKey)
     // {
-    // 	auto tx = BuildTx(value, fee, address, priv_key);
-    // 	if (tx == nullptr)
-    // 		return nullptr;
-    // 	LOG_INFO("Built transaction {}, broadcasting", tx->Id());
-    // 	if (!NetClient::SendMsgRandom(TxInfoMsg(tx)))
-    // 	{
-    // 		LOG_ERROR("No connection to send transaction");
-    // 	}
+    //     var tx = BuildTx(value, fee, address, privKey);
+    //     if (tx == null)
+    //         return null;
+    //     Logger.Information("Built transaction {}, broadcasting", tx.Id());
+    //     if (!NetClient.SendMsgRandom(new TxInfoMsg(tx)))
+    //         Logger.Error("No connection to send transaction");
     //
-    // 	return tx;
-    // }
-    //
-    // Wallet::TxStatusResponse Wallet::GetTxStatus_Miner(const std::string& tx_id)
-    // {
-    // 	TxStatusResponse ret;
-    //
-    // 	{
-    // 		std::scoped_lock lock(Mempool::Mutex);
-    //
-    // 		for (const auto& [tx, _] : Mempool::Map)
-    // 		{
-    // 			if (tx == tx_id)
-    // 			{
-    // 				ret.Status = TxStatus::Mempool;
-    //
-    // 				return ret;
-    // 			}
-    // 		}
-    // 	}
-    //
-    // 	{
-    // 		std::scoped_lock lock(Chain::Mutex);
-    //
-    // 		for (uint32_t height = 0; height < Chain::ActiveChain.size(); height++)
-    // 		{
-    // 			const auto& block = Chain::ActiveChain[height];
-    // 			for (const auto& tx : block->Txs)
-    // 			{
-    // 				if (tx->Id() == tx_id)
-    // 				{
-    // 					ret.Status = TxStatus::Mined;
-    // 					ret.BlockId = block->Id();
-    // 					ret.BlockHeight = height;
-    //
-    // 					return ret;
-    // 				}
-    // 			}
-    // 		}
-    // 	}
-    //
-    // 	ret.Status = TxStatus::NotFound;
-    //
-    // 	return ret;
-    // }
-    //
-    // Wallet::TxStatusResponse Wallet::GetTxStatus(const std::string& tx_id)
-    // {
-    // 	TxStatusResponse ret;
-    //
-    // 	if (MsgCache::SendMempoolMsg != nullptr)
-    // 		MsgCache::SendMempoolMsg = nullptr;
-    //
-    // 	if (!NetClient::SendMsgRandom(GetMempoolMsg()))
-    // 	{
-    // 		LOG_ERROR("No connection to ask mempool");
-    //
-    // 		return ret;
-    // 	}
-    //
-    // 	auto start = Utils::GetUnixTimestamp();
-    // 	while (MsgCache::SendMempoolMsg == nullptr)
-    // 	{
-    // 		if (Utils::GetUnixTimestamp() - start > MsgCache::MAX_MSG_AWAIT_TIME_IN_SECS)
-    // 		{
-    // 			LOG_ERROR("Timeout on GetMempoolMsg");
-    //
-    // 			return ret;
-    // 		}
-    // 		std::this_thread::sleep_for(std::chrono::milliseconds(16));
-    // 	}
-    //
-    // 	for (const auto& tx : MsgCache::SendMempoolMsg->Mempool)
-    // 	{
-    // 		if (tx == tx_id)
-    // 		{
-    // 			ret.Status = TxStatus::Mempool;
-    //
-    // 			return ret;
-    // 		}
-    // 	}
-    //
-    // 	if (MsgCache::SendActiveChainMsg != nullptr)
-    // 		MsgCache::SendActiveChainMsg = nullptr;
-    //
-    // 	if (!NetClient::SendMsgRandom(GetActiveChainMsg()))
-    // 	{
-    // 		LOG_ERROR("No connection to ask active chain");
-    //
-    // 		return ret;
-    // 	}
-    //
-    // 	start = Utils::GetUnixTimestamp();
-    // 	while (MsgCache::SendActiveChainMsg == nullptr)
-    // 	{
-    // 		if (Utils::GetUnixTimestamp() - start > MsgCache::MAX_MSG_AWAIT_TIME_IN_SECS)
-    // 		{
-    // 			LOG_ERROR("Timeout on GetActiveChainMsg");
-    //
-    // 			return ret;
-    // 		}
-    // 		std::this_thread::sleep_for(std::chrono::milliseconds(16));
-    // 	}
-    //
-    // 	for (uint32_t height = 0; height < MsgCache::SendActiveChainMsg->ActiveChain.size(); height++)
-    // 	{
-    // 		const auto& block = MsgCache::SendActiveChainMsg->ActiveChain[height];
-    // 		for (const auto& tx : block->Txs)
-    // 		{
-    // 			if (tx->Id() == tx_id)
-    // 			{
-    // 				ret.Status = TxStatus::Mined;
-    // 				ret.BlockId = block->Id();
-    // 				ret.BlockHeight = height;
-    //
-    // 				return ret;
-    // 			}
-    // 		}
-    // 	}
-    //
-    // 	ret.Status = TxStatus::NotFound;
-    //
-    // 	return ret;
-    // }
-    //
-    // void Wallet::PrintTxStatus(const std::string& tx_id)
-    // {
-    // 	auto response = GetTxStatus(tx_id);
-    // 	switch (response.Status)
-    // 	{
-    // 	case TxStatus::Mempool:
-    // 	{
-    // 		LOG_INFO("Transaction {} is in mempool", tx_id);
-    //
-    // 		break;
-    // 	}
-    // 	case TxStatus::Mined:
-    // 	{
-    // 		LOG_INFO("Transaction {} is mined in {} at height {}", tx_id, response.BlockId, response.BlockHeight);
-    //
-    // 		break;
-    // 	}
-    // 	case TxStatus::NotFound:
-    // 	{
-    // 		LOG_INFO("Transaction {} not found", tx_id);
-    //
-    // 		break;
-    // 	}
-    // 	}
-    // }
-    //
-    // uint64_t Wallet::GetBalance_Miner(const std::string& address)
-    // {
-    // 	const auto utxos = FindUTXOsForAddress_Miner(address);
-    // 	uint64_t value = 0;
-    // 	for (const auto& utxo : utxos)
-    // 		value += utxo->TxOut->Value;
-    //
-    // 	return value;
-    // }
-    //
-    // uint64_t Wallet::GetBalance(const std::string& address)
-    // {
-    // 	const auto utxos = FindUTXOsForAddress(address);
-    // 	uint64_t value = 0;
-    // 	for (const auto& utxo : utxos)
-    // 		value += utxo->TxOut->Value;
-    //
-    // 	return value;
-    // }
-    //
-    // void Wallet::PrintBalance(const std::string& address)
-    // {
-    // 	uint64_t balance = GetBalance(address);
-    // 	LOG_INFO("Address {} holds {} coins", address, balance);
+    //     return tx;
     // }
 
-    public static Tx BuildTxFromUTXOs(IList<UTXO> utxos, ulong value, ulong fee,
+    public static TxStatusResponse GetTxStatus_Miner(string tx_id)
+    {
+        var ret = new TxStatusResponse();
+
+        lock (Mempool.Mutex)
+        {
+            foreach (string tx in Mempool.Map.Keys)
+                if (tx == tx_id)
+                {
+                    ret.Status = TxStatus.Mempool;
+
+                    return ret;
+                }
+        }
+
+        lock (Chain.Mutex)
+        {
+            for (uint height = 0; height < Chain.ActiveChain.Count; height++)
+            {
+                var block = Chain.ActiveChain[(int)height];
+                foreach (var tx in block.Txs)
+                    if (tx.Id() == tx_id)
+                    {
+                        ret.Status = TxStatus.Mined;
+                        ret.BlockId = block.Id();
+                        ret.BlockHeight = height;
+
+                        return ret;
+                    }
+            }
+        }
+
+        ret.Status = TxStatus.NotFound;
+
+        return ret;
+    }
+
+    // public static TxStatusResponse GetTxStatus(string tx_id)
+    // {
+    //     var ret = new TxStatusResponse();
+    //
+    //     if (MsgCache.SendMempoolMsg != null)
+    //         MsgCache.SendMempoolMsg = null;
+    //
+    //     if (!NetClient.SendMsgRandom(new GetMempoolMsg()))
+    //     {
+    //         Logger.Error("No connection to ask mempool");
+    //
+    //         return ret;
+    //     }
+    //
+    //     long start = Utils.GetUnixTimestamp();
+    //     while (MsgCache.SendMempoolMsg == null)
+    //     {
+    //         if (Utils.GetUnixTimestamp() - start > MsgCache.MAX_MSG_AWAIT_TIME_IN_SECS)
+    //         {
+    //             Logger.Error("Timeout on GetMempoolMsg");
+    //
+    //             return ret;
+    //         }
+    //
+    //         Thread.Sleep(16);
+    //     }
+    //
+    //     foreach (var tx in MsgCache.SendMempoolMsg.Mempool)
+    //         if (tx == tx_id)
+    //         {
+    //             ret.Status = TxStatus.Mempool;
+    //
+    //             return ret;
+    //         }
+    //
+    //     if (MsgCache.SendActiveChainMsg != null)
+    //         MsgCache.SendActiveChainMsg = null;
+    //
+    //     if (!NetClient.SendMsgRandom(new GetActiveChainMsg()))
+    //     {
+    //         Logger.Error("No connection to ask active chain");
+    //
+    //         return ret;
+    //     }
+    //
+    //     start = Utils.GetUnixTimestamp();
+    //     while (MsgCache.SendActiveChainMsg == null)
+    //     {
+    //         if (Utils.GetUnixTimestamp() - start > MsgCache.MAX_MSG_AWAIT_TIME_IN_SECS)
+    //         {
+    //             Logger.Error("Timeout on GetActiveChainMsg");
+    //
+    //             return ret;
+    //         }
+    //
+    //         Thread.Sleep(16);
+    //     }
+    //
+    //     for (uint height = 0; height < MsgCache.SendActiveChainMsg.ActiveChain.Count; height++)
+    //     {
+    //         var block = MsgCache.SendActiveChainMsg.ActiveChain[(int)height];
+    //         foreach (var tx in block.Txs)
+    //             if (tx.Id() == tx_id)
+    //             {
+    //                 ret.Status = TxStatus.Mined;
+    //                 ret.BlockId = block.Id();
+    //                 ret.BlockHeight = height;
+    //
+    //                 return ret;
+    //             }
+    //     }
+    //
+    //     ret.Status = TxStatus.NotFound;
+    //
+    //     return ret;
+    // }
+
+    // public static void PrintTxStatus(string txId)
+    // {
+    // 	var response = GetTxStatus(txId);
+    // 	switch (response.Status)
+    // 	{
+    // 	case TxStatus.Mempool:
+    // 	{
+    // 		Logger.Information("Transaction {} is in mempool", txId);
+    //
+    // 		break;
+    // 	}
+    // 	case TxStatus.Mined:
+    // 	{
+    // 		Logger.Information("Transaction {} is mined in {} at height {}", txId, response.BlockId, response.BlockHeight);
+    //
+    // 		break;
+    // 	}
+    // 	case TxStatus.NotFound:
+    // 	{
+    // 		Logger.Information("Transaction {} not found", txId);
+    //
+    // 		break;
+    // 	}
+    // 	}
+    // }
+
+    public static ulong GetBalance_Miner(string address)
+    {
+        var utxos = FindUTXOsForAddress_Miner(address);
+        ulong value = 0;
+        foreach (var utxo in utxos)
+            value += utxo.TxOut.Value;
+
+        return value;
+    }
+
+    // public static ulong GetBalance(string address)
+    // {
+    // 	var utxos = FindUTXOsForAddress(address);
+    // 	ulong value = 0;
+    //     foreach (var utxo in utxos)
+    //         value += utxo.TxOut.Value;
+    //
+    // 	return value;
+    // }
+
+    // public static void PrintBalance(string address)
+    // {
+    // 	ulong balance = GetBalance(address);
+    // 	Logger.Information("Address {} holds {} coins", address, balance);
+    // }
+
+    private static Tx BuildTxFromUTXOs(IList<UTXO> utxos, ulong value, ulong fee,
         string address, string changeAddress,
         byte[] privKey)
     {
@@ -345,7 +343,7 @@ public static class Wallet
         return tx;
     }
 
-    public static Tx BuildTx_Miner(ulong value, ulong fee, string address,
+    private static Tx BuildTx_Miner(ulong value, ulong fee, string address,
         byte[] privKey)
     {
         byte[] pubKey = ECDSA.GetPubKeyFromPrivKey(privKey);
@@ -361,28 +359,28 @@ public static class Wallet
         return BuildTxFromUTXOs(myCoins, value, fee, address, myAddress, privKey);
     }
 
-    // std::shared_ptr<Tx> Wallet::BuildTx(uint64_t value, uint64_t fee, const std::string& address,
-    // 	const std::vector<uint8_t>& priv_key)
+    // private static Tx BuildTx(ulong value, ulong fee, string address, byte[] privKey)
     // {
-    // 	const auto pub_key = ECDSA::GetPubKeyFromPrivKey(priv_key);
-    // 	const auto my_address = PubKeyToAddress(pub_key);
-    // 	auto my_coins = FindUTXOsForAddress(my_address);
-    // 	if (my_coins.empty())
-    // 	{
-    // 		LOG_ERROR("No coins found");
+    //     byte[] pubKey = ECDSA.GetPubKeyFromPrivKey(privKey);
+    //     string myAddress = PubKeyToAddress(pubKey);
+    //     var myCoins = FindUTXOsForAddress(myAddress);
+    //     if (myCoins.empty())
+    //     {
+    //         Logger.Error("No coins found");
     //
-    // 		return nullptr;
-    // 	}
-    // 	return BuildTxFromUTXOs(my_coins, value, fee, address, my_address, priv_key);
+    //         return null;
+    //     }
+    //
+    //     return BuildTxFromUTXOs(myCoins, value, fee, address, myAddress, privKey);
     // }
 
-    public static IList<UTXO> FindUTXOsForAddress_Miner(string address)
+    private static IList<UTXO> FindUTXOsForAddress_Miner(string address)
     {
         var utxos = new List<UTXO>();
         {
-            lock (UTXO::Mutex)
+            lock (UTXO.Mutex)
             {
-                foreach (var v in UTXO::Map.Values)
+                foreach (var v in UTXO.Map.Values)
                     if (v.TxOut.ToAddress == address)
                         utxos.Add(v);
             }
@@ -390,38 +388,42 @@ public static class Wallet
         return utxos;
     }
 
-    // std::vector<std::shared_ptr<UTXO>> Wallet::FindUTXOsForAddress(const std::string& address)
+    // private static IList<UTXO> FindUTXOsForAddress(string address)
     // {
-    // 	if (MsgCache::SendUTXOsMsg != nullptr)
-    // 		MsgCache::SendUTXOsMsg = nullptr;
+    //     if (MsgCache.SendUTXOsMsg != null)
+    //         MsgCache.SendUTXOsMsg = null;
     //
-    // 	if (!NetClient::SendMsgRandom(GetUTXOsMsg()))
-    // 	{
-    // 		LOG_ERROR("No connection to ask UTXO set");
+    //     if (!NetClient.SendMsgRandom(new GetUTXOsMsg()))
+    //     {
+    //         Logger.Error("No connection to ask UTXO set");
     //
-    // 		return {};
-    // 	}
+    //         return new List<UTXO>();
+    //     }
     //
-    // 	const auto start = Utils::GetUnixTimestamp();
-    // 	while (MsgCache::SendUTXOsMsg == nullptr)
-    // 	{
-    // 		if (Utils::GetUnixTimestamp() - start > MsgCache::MAX_MSG_AWAIT_TIME_IN_SECS)
-    // 		{
-    // 			LOG_ERROR("Timeout on GetUTXOsMsg");
+    //     long start = Utils.GetUnixTimestamp();
+    //     while (MsgCache.SendUTXOsMsg == null)
+    //     {
+    //         if (Utils.GetUnixTimestamp() - start > MsgCache.MAX_MSG_AWAIT_TIME_IN_SECS)
+    //         {
+    //             Logger.Error("Timeout on GetUTXOsMsg");
     //
-    // 			return {};
-    // 		}
-    // 		std::this_thread::sleep_for(std::chrono::milliseconds(16));
-    // 	}
+    //             return new List<UTXO>();
+    //         }
     //
-    // 	std::vector<std::shared_ptr<UTXO>> utxos;
-    // 	for (const auto& [_, v] : MsgCache::SendUTXOsMsg->UTXO_Map)
-    // 	{
-    // 		if (v->TxOut->ToAddress == address)
-    // 		{
-    // 			utxos.push_back(v);
-    // 		}
-    // 	}
-    // 	return utxos;
+    //         Thread.Sleep(16);
+    //     }
+    //
+    //     var utxos = new List<UTXO>();
+    //     foreach (var v in MsgCache.SendUTXOsMsg->UTXO_Map.Values)
+    //         if (v.TxOut.ToAddress == address)
+    //             utxos.Add(v);
+    //     return utxos;
     // }
+
+    public class TxStatusResponse
+    {
+        public long BlockHeight = -1;
+        public string BlockId = string.Empty;
+        public TxStatus Status = TxStatus.NotFound;
+    }
 }
