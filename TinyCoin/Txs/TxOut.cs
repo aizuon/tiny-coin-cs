@@ -4,11 +4,12 @@ namespace TinyCoin.Txs;
 
 public class TxOut : ISerializable, IDeserializable<TxOut>, IEquatable<TxOut>, ICloneable<TxOut>
 {
-    public string ToAddress = string.Empty;
+    public string ToAddress;
     public ulong Value;
 
     public TxOut()
     {
+        ToAddress = string.Empty;
     }
 
     public TxOut(ulong value, string toAddress)

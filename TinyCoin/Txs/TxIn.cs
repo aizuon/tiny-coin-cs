@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 
 namespace TinyCoin.Txs;
 
@@ -11,6 +12,8 @@ public class TxIn : ISerializable, IDeserializable<TxIn>, IEquatable<TxIn>, IClo
 
     public TxIn()
     {
+        UnlockPubKey = Array.Empty<byte>();
+        UnlockSig = Array.Empty<byte>();
     }
 
     public TxIn(TxOutPoint toSpend, byte[] unlockSig, byte[] unlockPubKey, int sequence)
@@ -57,7 +60,8 @@ public class TxIn : ISerializable, IDeserializable<TxIn>, IEquatable<TxIn>, IClo
             return false;
         if (ReferenceEquals(this, other))
             return true;
-        return ToSpend == other.ToSpend && UnlockSig == other.UnlockSig && UnlockPubKey == other.UnlockPubKey &&
+        return ToSpend == other.ToSpend && UnlockSig.SequenceEqual(other.UnlockSig) &&
+               UnlockPubKey.SequenceEqual(other.UnlockPubKey) &&
                Sequence == other.Sequence;
     }
 

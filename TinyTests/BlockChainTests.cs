@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TinyCoin;
 using TinyCoin.BlockChain;
+using TinyCoin.Crypto;
 using TinyCoin.Txs;
 using Xunit;
 using UTXO = TinyCoin.Txs.UnspentTxOut;
@@ -290,149 +292,139 @@ public class BlockChainTests
         }
     }
 
-    // #ifndef _DEBUG
-    // TEST(BlockChainTest_LongRunning, DependentTxsInSingleBlock)
-    // {
-    // 	Chain::ActiveChain.clear();
-    // 	Chain::SideBranches.clear();
-    // 	Mempool::Map.clear();
-    // 	UTXO::Map.clear();
-    //
-    // 	ASSERT_EQ(Chain::ActiveChainIdx, Chain::ConnectBlock(chain1[0]));
-    // 	ASSERT_EQ(Chain::ActiveChainIdx, Chain::ConnectBlock(chain1[1]));
-    //
-    // 	ASSERT_EQ(2, Chain::ActiveChain.size());
-    // 	ASSERT_EQ(2, UTXO::Map.size());
-    //
-    // 	auto priv_key = Utils::HexStringToByteArray("18e14a7b6a307f426a94f8114701e7c8e774e7f9a47e2c2035db29a206321725");
-    // 	auto pub_key = ECDSA::GetPubKeyFromPrivKey(priv_key);
-    // 	auto address = Wallet::PubKeyToAddress(pub_key);
-    //
-    // 	const auto& utxo1 = UTXO::Map.begin()->second;
-    // 	auto tx_out1 = std::make_shared<TxOut>(901, utxo1->TxOut->ToAddress);
-    // 	std::vector tx_outs1{ tx_out1 };
-    // 	auto tx_in1 = Wallet::BuildTxIn(priv_key, utxo1->TxOutPoint, tx_outs1);
-    // 	auto tx1 = std::make_shared<Tx>(std::vector{ tx_in1 }, tx_outs1, 0);
-    //
-    // 	ASSERT_THROW(
-    // 		{
-    // 		try
-    // 		{
-    // 		tx1->Validate(Tx::ValidateRequest());
-    // 		}
-    // 		catch (const TxValidationException& ex)
-    // 		{
-    // 		ASSERT_STREQ("Coinbase UTXO not ready for spending", ex.what());
-    // 		throw;
-    // 		}
-    // 		},
-    // 		TxValidationException);
-    //
-    // 	Chain::ConnectBlock(chain1[2]);
-    //
-    // 	Mempool::AddTxToMempool(tx1);
-    // 	ASSERT_TRUE(Mempool::Map.contains(tx1->Id()));
-    //
-    // 	auto tx_out2 = std::make_shared<TxOut>(9001, tx_out1->ToAddress);
-    // 	std::vector tx_outs2{ tx_out2 };
-    // 	auto tx_out_point2 = std::make_shared<TxOutPoint>(tx1->Id(), 0);
-    // 	auto tx_in2 = Wallet::BuildTxIn(priv_key, tx_out_point2, tx_outs2);
-    // 	auto tx2 = std::make_shared<Tx>(std::vector{ tx_in2 }, tx_outs2, 0);
-    //
-    // 	Mempool::AddTxToMempool(tx2);
-    // 	ASSERT_FALSE(Mempool::Map.contains(tx2->Id()));
-    //
-    // 	ASSERT_THROW(
-    // 		{
-    // 		try
-    // 		{
-    // 		tx2->Validate(Tx::ValidateRequest());
-    // 		}
-    // 		catch (const TxValidationException& ex)
-    // 		{
-    // 		ASSERT_STREQ("Spent value more than available", ex.what());
-    // 		throw;
-    // 		}
-    // 		},
-    // 		TxValidationException);
-    //
-    // 	tx_out2->Value = 901;
-    // 	tx_in2 = Wallet::BuildTxIn(priv_key, tx_out_point2, tx_outs2);
-    // 	tx2->TxIns[0] = tx_in2;
-    //
-    // 	Mempool::AddTxToMempool(tx2);
-    // 	ASSERT_TRUE(Mempool::Map.contains(tx2->Id()));
-    //
-    // 	auto block = PoW::AssembleAndSolveBlock(address);
-    //
-    // 	ASSERT_EQ(Chain::ActiveChainIdx, Chain::ConnectBlock(block));
-    //
-    // 	ASSERT_EQ(*Chain::ActiveChain.back(), *block);
-    // 	ASSERT_EQ(2, block->Txs.size() - 1);
-    // 	std::array txs{ tx1, tx2 };
-    // 	for (uint32_t i = 0; i < txs.size(); i++)
-    // 	{
-    // 		ASSERT_EQ(*txs[i], *block->Txs[i + 1]);
-    // 	}
-    // 	ASSERT_FALSE(Mempool::Map.contains(tx1->Id()));
-    // 	ASSERT_FALSE(Mempool::Map.contains(tx2->Id()));
-    // 	auto map_it1 = std::ranges::find_if(UTXO::Map,
-    // 		[&tx1](const std::pair<std::shared_ptr<TxOutPoint>, std::shared_ptr<UTXO>>& p)
-    // 		{
-    // 			const auto& [txOutPoint, utxo] = p;
-    // 			return txOutPoint->TxId == tx1->Id() && txOutPoint->TxOutIdx == 0;
-    // 		});
-    // 	ASSERT_EQ(map_it1, UTXO::Map.end());
-    // 	auto map_it2 = std::ranges::find_if(UTXO::Map,
-    // 		[&tx2](const std::pair<std::shared_ptr<TxOutPoint>, std::shared_ptr<UTXO>>& p)
-    // 		{
-    // 			const auto& [txOutPoint, utxo] = p;
-    // 			return txOutPoint->TxId == tx2->Id() && txOutPoint->TxOutIdx == 0;
-    // 		});
-    // 	ASSERT_NE(map_it2, UTXO::Map.end());
-    // }
-    //
+#if !DEBUG
+    [Fact]
+    public void DependentTxsInSingleBlock()
+    {
+        Chain.ActiveChain.Clear();
+        Chain.SideBranches.Clear();
+        Mempool.Map.Clear();
+        UTXO.Map.Clear();
+
+        Assert.Equal(Chain.ActiveChainIdx, Chain.ConnectBlock(Chain1[0]));
+        Assert.Equal(Chain.ActiveChainIdx, Chain.ConnectBlock(Chain1[1]));
+
+        Assert.Equal(2, Chain.ActiveChain.Count);
+        Assert.Equal(2, UTXO.Map.Count);
+
+        byte[] privKey = Utils.HexStringToByteArray("18e14a7b6a307f426a94f8114701e7c8e774e7f9a47e2c2035db29a206321725");
+        byte[] pubKey = ECDSA.GetPubKeyFromPrivKey(privKey);
+        string address = Wallet.PubKeyToAddress(pubKey);
+
+        var utxo1 = UTXO.Map.First().Value;
+        var txOut1 = new TxOut(901, utxo1.TxOut.ToAddress);
+        var txOuts1 = new List<TxOut> { txOut1 };
+        var txIn1 = Wallet.BuildTxIn(privKey, utxo1.TxOutPoint, txOuts1);
+        var tx1 = new Tx(new List<TxIn> { txIn1 }, txOuts1, 0);
+
+        Assert.Throws<TxValidationException>(() =>
+        {
+            try
+            {
+                tx1.Validate(new Tx.ValidateRequest());
+            }
+            catch (TxValidationException ex)
+            {
+                Assert.Equal("Coinbase UTXO not ready for spending", ex.Message);
+                throw;
+            }
+        });
+
+        Chain.ConnectBlock(Chain1[2]);
+
+        Mempool.AddTxToMempool(tx1);
+        Assert.True(Mempool.Map.ContainsKey(tx1.Id()));
+
+        var txOut2 = new TxOut(9001, txOut1.ToAddress);
+        var txOuts2 = new List<TxOut> { txOut2 };
+        var txOutPoint2 = new TxOutPoint(tx1.Id(), 0);
+        var txIn2 = Wallet.BuildTxIn(privKey, txOutPoint2, txOuts2);
+        var tx2 = new Tx(new List<TxIn> { txIn2 }, txOuts2, 0);
+
+        Mempool.AddTxToMempool(tx2);
+        Assert.False(Mempool.Map.ContainsKey(tx2.Id()));
+
+        Assert.Throws<TxValidationException>(() =>
+        {
+            try
+            {
+                tx2.Validate(new Tx.ValidateRequest());
+            }
+            catch (TxValidationException ex)
+            {
+                Assert.Equal("Spent value more than available", ex.Message);
+                throw;
+            }
+        });
+
+        txOut2.Value = 901;
+        txIn2 = Wallet.BuildTxIn(privKey, txOutPoint2, txOuts2);
+        tx2.TxIns[0] = txIn2;
+
+        Mempool.AddTxToMempool(tx2);
+        Assert.True(Mempool.Map.ContainsKey(tx2.Id()));
+
+        var block = PoW.AssembleAndSolveBlock(address);
+
+        Assert.Equal(Chain.ActiveChainIdx, Chain.ConnectBlock(block));
+
+        Assert.Equal(Chain.ActiveChain.Last(), block);
+        Assert.Equal(2, block.Txs.Count - 1);
+        var txs = new[] { tx1, tx2 };
+        for (uint i = 0; i < txs.Length; i++)
+            Assert.Equal(txs[(int)i], block.Txs[(int)(i + 1)]);
+        Assert.False(Mempool.Map.ContainsKey(tx1.Id()));
+        Assert.False(Mempool.Map.ContainsKey(tx2.Id()));
+        var mapIt1 =
+            UTXO.Map.Keys.FirstOrDefault(txOutPoint => txOutPoint.TxId == tx1.Id() && txOutPoint.TxOutIdx == 0);
+        Assert.Null(mapIt1);
+
+        var mapIt2 =
+            UTXO.Map.Keys.FirstOrDefault(txOutPoint => txOutPoint.TxId == tx2.Id() && txOutPoint.TxOutIdx == 0);
+        Assert.NotNull(mapIt2);
+    }
+
     // TEST(BlockChainTest_LongRunning, MinerTransaction)
     // {
-    // 	Chain::ActiveChain.clear();
-    // 	Chain::SideBranches.clear();
-    // 	Mempool::Map.clear();
-    // 	UTXO::Map.clear();
+    // 	Chain.ActiveChain.Clear();
+    // 	Chain.SideBranches.Clear();
+    // 	Mempool.Map.Clear();
+    // 	UTXO.Map.Clear();
     //
-    // 	const auto [miner_priv_key, miner_pub_key, miner_address] = Wallet::InitWallet("miner.dat");
-    // 	const auto [receiver_priv_key, receiver_pub_key, receiver_address] = Wallet::InitWallet("receiver.dat");
+    // 	var [miner_priv_key, miner_pub_key, miner_address] = Wallet.InitWallet("miner.dat");
+    // 	var [receiver_priv_key, receiver_pub_key, receiver_address] = Wallet.InitWallet("receiver.dat");
     //
-    // 	const auto first_block = PoW::AssembleAndSolveBlock(miner_address);
+    // 	var first_block = PoW.AssembleAndSolveBlock(miner_address);
     // 	if (first_block == nullptr)
     // 		FAIL();
-    // 	Chain::ConnectBlock(first_block);
-    // 	Chain::SaveToDisk();
+    // 	Chain.ConnectBlock(first_block);
+    // 	Chain.SaveToDisk();
     //
-    // 	for (int i = 0; i < NetParams::COINBASE_MATURITY + 1; i++)
+    // 	for (int i = 0; i < NetParams.COINBASE_MATURITY + 1; i++)
     // 	{
-    // 		const auto maturity_blocks = PoW::AssembleAndSolveBlock(miner_address);
+    // 		var maturity_blocks = PoW.AssembleAndSolveBlock(miner_address);
     // 		if (maturity_blocks == nullptr)
     // 			FAIL();
-    // 		Chain::ConnectBlock(maturity_blocks);
-    // 		Chain::SaveToDisk();
+    // 		Chain.ConnectBlock(maturity_blocks);
+    // 		Chain.SaveToDisk();
     // 	}
     //
-    // 	ASSERT_GT(Wallet::GetBalance_Miner(miner_address), 0);
-    // 	auto tx = Wallet::SendValue_Miner(first_block->Txs.front()->TxOuts.front()->Value / 2, 100, receiver_address,
+    // 	ASSERT_GT(Wallet.GetBalance_Miner(miner_address), 0);
+    // 	var tx = Wallet.SendValue_Miner(first_block.Txs.front().TxOuts.front().Value / 2, 100, receiver_address,
     // 		miner_priv_key);
     // 	ASSERT_TRUE(tx != nullptr);
-    // 	ASSERT_EQ(Wallet::GetTxStatus_Miner(tx->Id()).Status, TxStatus::Mempool);
+    // 	Assert.Equal(Wallet.GetTxStatus_Miner(tx.Id()).Status, TxStatus.Mempool);
     //
-    // 	const auto post_tx_block = PoW::AssembleAndSolveBlock(miner_address);
+    // 	var post_tx_block = PoW.AssembleAndSolveBlock(miner_address);
     // 	if (post_tx_block == nullptr)
     // 		FAIL();
-    // 	Chain::ConnectBlock(post_tx_block);
-    // 	Chain::SaveToDisk();
+    // 	Chain.ConnectBlock(post_tx_block);
+    // 	Chain.SaveToDisk();
     //
-    // 	auto mined_tx_status = Wallet::GetTxStatus_Miner(tx->Id());
-    // 	ASSERT_EQ(mined_tx_status.Status, TxStatus::Mined);
-    // 	ASSERT_EQ(mined_tx_status.BlockId, post_tx_block->Id());
-    // 	ASSERT_GT(Wallet::GetBalance_Miner(receiver_address), 0);
+    // 	var mined_tx_status = Wallet.GetTxStatus_Miner(tx.Id());
+    // 	Assert.Equal(mined_tx_status.Status, TxStatus.Mined);
+    // 	Assert.Equal(mined_tx_status.BlockId, post_tx_block.Id());
+    // 	ASSERT_GT(Wallet.GetBalance_Miner(receiver_address), 0);
     // }
-    // #endif
+#endif
 }

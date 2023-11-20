@@ -22,6 +22,9 @@ public class Block : ISerializable, IDeserializable<Block>, IEquatable<Block>, I
 
     public Block()
     {
+        MerkleHash = string.Empty;
+        PrevBlockHash = string.Empty;
+        Txs = new List<Tx>();
     }
 
     public Block(ulong version, string prevBlockHash, string merkleHash, long timestamp,

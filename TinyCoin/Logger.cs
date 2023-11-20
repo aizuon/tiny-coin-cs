@@ -26,7 +26,7 @@ public static class Logger
 #if DEBUG
             .MinimumLevel.Verbose()
 #else
-                         .MinimumLevel.Information()
+            .MinimumLevel.Information()
 #endif
             .CreateLogger();
     }

@@ -41,6 +41,9 @@ public static class PoW
 
     public static Block AssembleAndSolveBlock(string payCoinbaseToAddress, IList<Tx> txs = null)
     {
+        if (txs == null)
+            txs = new List<Tx>();
+
         string prevBlockHash;
         lock (Chain.Mutex)
         {
@@ -54,9 +57,9 @@ public static class PoW
             block = Mempool.SelectFromMempool(block);
 
         ulong fees = CalculateFees(block);
-        var coinbase_tx = Tx.CreateCoinbase(payCoinbaseToAddress, GetBlockSubsidy() + fees,
+        var coinbaseTx = Tx.CreateCoinbase(payCoinbaseToAddress, GetBlockSubsidy() + fees,
             Chain.ActiveChain.Count);
-        block.Txs.Insert(0, coinbase_tx);
+        block.Txs.Insert(0, coinbaseTx);
         block.MerkleHash = MerkleTree.GetRootOfTxs(block.Txs).Value;
 
         if (block.Serialize().Buffer.Length > NetParams.MaxBlockSerializedSizeInBytes)

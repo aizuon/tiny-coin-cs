@@ -4,11 +4,12 @@ namespace TinyCoin.Txs;
 
 public class TxOutPoint : ISerializable, IDeserializable<TxOutPoint>, IEquatable<TxOutPoint>, ICloneable<TxOutPoint>
 {
-    public string TxId = string.Empty;
+    public string TxId;
     public long TxOutIdx = -1;
 
     public TxOutPoint()
     {
+        TxId = string.Empty;
     }
 
     public TxOutPoint(string txId, long txOutIdx)

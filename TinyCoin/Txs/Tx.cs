@@ -15,11 +15,13 @@ public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>, ICloneable
     private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(Tx));
 
     public long LockTime;
-    public IList<TxIn> TxIns = new List<TxIn>();
-    public IList<TxOut> TxOuts = new List<TxOut>();
+    public IList<TxIn> TxIns;
+    public IList<TxOut> TxOuts;
 
     public Tx()
     {
+        TxIns = new List<TxIn>();
+        TxOuts = new List<TxOut>();
     }
 
     public Tx(IList<TxIn> txIns, IList<TxOut> txOuts, long lockTime)
