@@ -1,12 +1,18 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
+using Serilog;
+using Serilog.Core;
+using TinyCoin.BlockChain;
 using TinyCoin.P2P;
 using TinyCoin.Txs;
+using UTXO = TinyCoin.Txs.UnspentTxOut;
 
 namespace TinyCoin.Crypto;
 
 public static class Wallet
 {
     private const char PubKeyHashVersion = '1';
+    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(Wallet));
 
     public static string PubKeyToAddress(byte[] pubKey)
     {
@@ -94,19 +100,19 @@ public static class Wallet
         return new TxIn(txOutPoint, unlockSig, pubKey, sequence);
     }
 
-    // std::shared_ptr<Tx> Wallet::SendValue_Miner(uint64_t value, uint64_t fee, const std::string& address,
-    // 	const std::vector<uint8_t>& priv_key)
-    // {
-    // 	auto tx = BuildTx_Miner(value, fee, address, priv_key);
-    // 	if (tx == nullptr)
-    // 		return nullptr;
-    // 	LOG_INFO("Built transaction {}, adding to mempool", tx->Id());
-    // 	Mempool::AddTxToMempool(tx);
-    // 	NetClient::SendMsgRandom(TxInfoMsg(tx));
-    //
-    // 	return tx;
-    // }
-    //
+    public static Tx SendValue_Miner(ulong value, ulong fee, string address,
+        byte[] privKey)
+    {
+        var tx = BuildTx_Miner(value, fee, address, privKey);
+        if (tx == null)
+            return null;
+        Logger.Information("Built transaction {}, adding to mempool", tx.Id());
+        Mempool.AddTxToMempool(tx);
+        // NetClient::SendMsgRandom(TxInfoMsg(tx));
+
+        return tx;
+    }
+
     // std::shared_ptr<Tx> Wallet::SendValue(uint64_t value, uint64_t fee, const std::string& address,
     // 	const std::vector<uint8_t>& priv_key)
     // {
@@ -295,80 +301,66 @@ public static class Wallet
     // 	uint64_t balance = GetBalance(address);
     // 	LOG_INFO("Address {} holds {} coins", address, balance);
     // }
-    //
-    // std::shared_ptr<Tx> Wallet::BuildTxFromUTXOs(std::vector<std::shared_ptr<UTXO>>& utxos, uint64_t value, uint64_t fee,
-    // 	const std::string& address, const std::string& change_address,
-    // 	const std::vector<uint8_t>& priv_key)
-    // {
-    // 	std::ranges::sort(utxos,
-    // 		[](const std::shared_ptr<UTXO>& a, const std::shared_ptr<UTXO>& b) -> bool
-    // 		{
-    // 			return a->TxOut->Value < b->TxOut->Value;
-    // 		});
-    // 	std::ranges::sort(utxos,
-    // 		[](const std::shared_ptr<UTXO>& a, const std::shared_ptr<UTXO>& b) -> bool
-    // 		{
-    // 			return a->Height < b->Height;
-    // 		});
-    // 	std::unordered_set<std::shared_ptr<UTXO>> selected_utxos;
-    // 	uint64_t in_sum = 0;
-    // 	const uint32_t total_size_est = 300;
-    // 	const uint64_t total_fee_est = total_size_est * fee;
-    // 	for (const auto& coin : utxos)
-    // 	{
-    // 		selected_utxos.insert(selected_utxos.end(), coin);
-    // 		for (const auto& selected_coin : selected_utxos)
-    // 		{
-    // 			in_sum += selected_coin->TxOut->Value;
-    // 		}
-    // 		if (in_sum <= value + total_fee_est)
-    // 		{
-    // 			in_sum = 0;
-    // 		}
-    // 		else
-    // 		{
-    // 			break;
-    // 		}
-    // 	}
-    // 	if (in_sum == 0)
-    // 	{
-    // 		LOG_ERROR("Not enough coins");
-    //
-    // 		return nullptr;
-    // 	}
-    // 	const auto tx_out = std::make_shared<TxOut>(value, address);
-    // 	uint64_t change = in_sum - value - total_fee_est;
-    // 	const auto tx_out_change = std::make_shared<TxOut>(change, change_address);
-    // 	std::vector tx_outs{ tx_out, tx_out_change };
-    // 	std::vector<std::shared_ptr<TxIn>> tx_ins;
-    // 	tx_ins.reserve(selected_utxos.size());
-    // 	for (const auto& selected_coin : selected_utxos)
-    // 	{
-    // 		tx_ins.emplace_back(BuildTxIn(priv_key, selected_coin->TxOutPoint, tx_outs));
-    // 	}
-    // 	auto tx = std::make_shared<Tx>(tx_ins, tx_outs, 0);
-    // 	const uint32_t tx_size = tx->Serialize().GetBuffer().size();
-    // 	const uint32_t real_fee = total_fee_est / tx_size;
-    // 	LOG_INFO("Built transaction {} with {} coins/byte fee", tx->Id(), real_fee);
-    // 	return tx;
-    // }
-    //
-    // std::shared_ptr<Tx> Wallet::BuildTx_Miner(uint64_t value, uint64_t fee, const std::string& address,
-    // 	const std::vector<uint8_t>& priv_key)
-    // {
-    // 	const auto pub_key = ECDSA::GetPubKeyFromPrivKey(priv_key);
-    // 	const auto my_address = PubKeyToAddress(pub_key);
-    // 	auto my_coins = FindUTXOsForAddress_Miner(my_address);
-    // 	if (my_coins.empty())
-    // 	{
-    // 		LOG_ERROR("No coins found");
-    //
-    // 		return nullptr;
-    // 	}
-    //
-    // 	return BuildTxFromUTXOs(my_coins, value, fee, address, my_address, priv_key);
-    // }
-    //
+
+    public static Tx BuildTxFromUTXOs(IList<UTXO> utxos, ulong value, ulong fee,
+        string address, string changeAddress,
+        byte[] privKey)
+    {
+        var utxosList = utxos.ToList();
+        utxosList.Sort((a, b) => a.TxOut.Value.CompareTo(b.TxOut.Value));
+        utxosList.Sort((a, b) => a.Height.CompareTo(b.Height));
+        var selectedUtxos = new HashSet<UTXO>();
+        ulong inSum = 0;
+        uint totalSizeEst = 300;
+        ulong totalFeeEst = totalSizeEst * fee;
+        foreach (var coin in utxosList)
+        {
+            selectedUtxos.Add(coin);
+            foreach (var selectedCoin in selectedUtxos)
+                inSum += selectedCoin.TxOut.Value;
+            if (inSum <= value + totalFeeEst)
+                inSum = 0;
+            else
+                break;
+        }
+
+        if (inSum == 0)
+        {
+            Logger.Error("Not enough coins");
+
+            return null;
+        }
+
+        var txOut = new TxOut(value, address);
+        ulong change = inSum - value - totalFeeEst;
+        var txOutChange = new TxOut(change, changeAddress);
+        var txOuts = new List<TxOut> { txOut, txOutChange };
+        var txIns = new List<TxIn>(selectedUtxos.Count);
+        foreach (var selectedCoin in selectedUtxos)
+            txIns.Add(BuildTxIn(privKey, selectedCoin.TxOutPoint, txOuts));
+        var tx = new Tx(txIns, txOuts, 0);
+        uint txSize = (uint)tx.Serialize().Buffer.Length;
+        uint realFee = (uint)(totalFeeEst / txSize);
+        Logger.Information("Built transaction {} with {} coins/byte fee", tx.Id(), realFee);
+        return tx;
+    }
+
+    public static Tx BuildTx_Miner(ulong value, ulong fee, string address,
+        byte[] privKey)
+    {
+        byte[] pubKey = ECDSA.GetPubKeyFromPrivKey(privKey);
+        string myAddress = PubKeyToAddress(pubKey);
+        var myCoins = FindUTXOsForAddress_Miner(myAddress);
+        if (myCoins.Count == 0)
+        {
+            Logger.Error("No coins found");
+
+            return null;
+        }
+
+        return BuildTxFromUTXOs(myCoins, value, fee, address, myAddress, privKey);
+    }
+
     // std::shared_ptr<Tx> Wallet::BuildTx(uint64_t value, uint64_t fee, const std::string& address,
     // 	const std::vector<uint8_t>& priv_key)
     // {
@@ -383,24 +375,21 @@ public static class Wallet
     // 	}
     // 	return BuildTxFromUTXOs(my_coins, value, fee, address, my_address, priv_key);
     // }
-    //
-    // std::vector<std::shared_ptr<UTXO>> Wallet::FindUTXOsForAddress_Miner(const std::string& address)
-    // {
-    // 	std::vector<std::shared_ptr<UTXO>> utxos;
-    // 	{
-    // 		std::scoped_lock lock(UTXO::Mutex);
-    //
-    // 		for (const auto& [_, v] : UTXO::Map)
-    // 		{
-    // 			if (v->TxOut->ToAddress == address)
-    // 			{
-    // 				utxos.push_back(v);
-    // 			}
-    // 		}
-    // 	}
-    // 	return utxos;
-    // }
-    //
+
+    public static IList<UTXO> FindUTXOsForAddress_Miner(string address)
+    {
+        var utxos = new List<UTXO>();
+        {
+            lock (UTXO::Mutex)
+            {
+                foreach (var v in UTXO::Map.Values)
+                    if (v.TxOut.ToAddress == address)
+                        utxos.Add(v);
+            }
+        }
+        return utxos;
+    }
+
     // std::vector<std::shared_ptr<UTXO>> Wallet::FindUTXOsForAddress(const std::string& address)
     // {
     // 	if (MsgCache::SendUTXOsMsg != nullptr)
