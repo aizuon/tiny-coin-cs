@@ -24,11 +24,6 @@ public class TxIn : ISerializable, IDeserializable<TxIn>, IEquatable<TxIn>, IClo
         Sequence = sequence;
     }
 
-    public TxIn Clone()
-    {
-        return Deserialize(Serialize());
-    }
-
     public static TxIn Deserialize(BinaryBuffer buffer)
     {
         var txIn = new TxIn();

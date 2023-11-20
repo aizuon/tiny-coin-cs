@@ -2,19 +2,21 @@ using System.Collections.Generic;
 using System.Linq;
 using Serilog;
 using Serilog.Core;
+using TinyCoin.P2P;
+using TinyCoin.P2P.Messages;
 using TinyCoin.Txs;
 using UTXO = TinyCoin.Txs.UnspentTxOut;
 
 namespace TinyCoin.BlockChain;
 
-public static class Mempool
+public static class MemPool
 {
-    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(Mempool));
+    private static readonly ILogger Logger = Log.ForContext(Constants.SourceContextPropertyName, nameof(MemPool));
     public static Dictionary<string, Tx> Map = new Dictionary<string, Tx>();
     public static List<Tx> OrphanedTxs = new List<Tx>();
     public static readonly object Mutex = new object();
 
-    public static UTXO Find_UTXO_InMempool(TxOutPoint txOutPoint)
+    public static UTXO Find_UTXO_InMemPool(TxOutPoint txOutPoint)
     {
         lock (Mutex)
         {
@@ -24,7 +26,7 @@ public static class Mempool
             var tx = Map[txOutPoint.TxId];
             if (tx.TxOuts.Count - 1 < txOutPoint.TxOutIdx)
             {
-                Logger.Error("Unable to find UTXO in mempool for {}", txOutPoint.TxId);
+                Logger.Error("Unable to find UTXO in MemPool for {}", txOutPoint.TxId);
                 return null;
             }
 
@@ -33,7 +35,7 @@ public static class Mempool
         }
     }
 
-    public static Block SelectFromMempool(Block block)
+    public static Block SelectFromMemPool(Block block)
     {
         lock (Mutex)
         {
@@ -50,7 +52,7 @@ public static class Mempool
         }
     }
 
-    public static void AddTxToMempool(Tx tx)
+    public static void AddTxToMemPool(Tx tx)
     {
         lock (Mutex)
         {
@@ -81,9 +83,9 @@ public static class Mempool
             }
 
             Map[txId] = tx;
-            Logger.Debug("Transaction {} added to mempool", txId);
+            Logger.Debug("Transaction {} added to MemPool", txId);
 
-            // NetClient.SendMsgRandom(new TxInfoMsg(tx));
+            NetClient.SendMsgRandom(new TxInfoMsg(tx));
         }
     }
 
@@ -109,14 +111,14 @@ public static class Mempool
                 if (UTXO.FindInMap(toSpend) != null)
                     continue;
 
-                var inMempool = Find_UTXO_InMempool(toSpend);
-                if (inMempool == null)
+                var inMemPool = Find_UTXO_InMemPool(toSpend);
+                if (inMemPool == null)
                 {
                     Logger.Error("Unable to find UTXO for {}", txIn.ToSpend.TxId);
                     return null;
                 }
 
-                block = TryAddToBlock(block, inMempool.TxOutPoint.TxId, addedToBlock);
+                block = TryAddToBlock(block, inMemPool.TxOutPoint.TxId, addedToBlock);
                 if (block == null)
                 {
                     Logger.Error("Unable to add parent");

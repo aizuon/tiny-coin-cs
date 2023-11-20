@@ -39,11 +39,6 @@ public class Block : ISerializable, IDeserializable<Block>, IEquatable<Block>, I
         Txs = txs;
     }
 
-    public Block Clone()
-    {
-        return Deserialize(Serialize());
-    }
-
     public static Block Deserialize(BinaryBuffer buffer)
     {
         var block = new Block();
@@ -71,7 +66,12 @@ public class Block : ISerializable, IDeserializable<Block>, IEquatable<Block>, I
             return null;
         block.Txs = new List<Tx>((int)txsSize);
         for (int i = 0; i < txsSize; i++)
-            block.Txs.Add(Tx.Deserialize(buffer));
+        {
+            var tx = Tx.Deserialize(buffer);
+            if (tx == null)
+                return null;
+            block.Txs.Add(tx);
+        }
 
         return block;
     }

@@ -7,6 +7,8 @@ using System.Numerics;
 using Serilog;
 using Serilog.Core;
 using TinyCoin.Crypto;
+using TinyCoin.P2P;
+using TinyCoin.P2P.Messages;
 using TinyCoin.Txs;
 using UTXO = TinyCoin.Txs.UnspentTxOut;
 
@@ -132,7 +134,7 @@ public static class Chain
             var req = new Tx.ValidateRequest
             {
                 SiblingsInBlock = nonCoinbaseTxs,
-                Allow_UTXO_FromMempool = false
+                Allow_UTXO_FromMemPool = false
             };
             foreach (var nonCoinbaseTx in nonCoinbaseTxs)
                 try
@@ -213,9 +215,9 @@ public static class Chain
                 {
                     string txId = tx.Id();
 
-                    lock (Mempool.Mutex)
+                    lock (MemPool.Mutex)
                     {
-                        Mempool.Map.Remove(txId);
+                        MemPool.Map.Remove(txId);
                     }
 
                     if (!tx.IsCoinbase())
@@ -233,7 +235,7 @@ public static class Chain
                 Logger.Information("Block accepted at height {} with {} txs", ActiveChain.Count - 1, block.Txs.Count);
             }
 
-            // NetClient.SendMsgRandom(BlockInfoMsg(block));
+            NetClient.SendMsgRandom(new BlockInfoMsg(block));
 
             return chainIdx;
         }
@@ -253,9 +255,9 @@ public static class Chain
             {
                 string txId = tx.Id();
 
-                lock (Mempool.Mutex)
+                lock (MemPool.Mutex)
                 {
-                    Mempool.Map[txId] = tx;
+                    MemPool.Map[txId] = tx;
                 }
 
                 foreach (var txIn in tx.TxIns)
@@ -493,7 +495,7 @@ public static class Chain
                                 ActiveChain.Add(GenesisBlock);
                                 SideBranches.Clear();
                                 UTXO.Map.Clear();
-                                Mempool.Map.Clear();
+                                MemPool.Map.Clear();
 
                                 Logger.Error("Load chain failed, starting from genesis");
                                 return false;

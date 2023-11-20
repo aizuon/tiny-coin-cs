@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
 using Serilog.Core;
 using TinyCoin.Crypto;
+using TinyCoin.P2P;
+using TinyCoin.P2P.Messages;
 using TinyCoin.Txs;
 using UTXO = TinyCoin.Txs.UnspentTxOut;
 
@@ -54,7 +57,7 @@ public static class PoW
             GetNextWorkRequired(prevBlockHash), 0, txs);
 
         if (block.Txs.Count == 0)
-            block = Mempool.SelectFromMempool(block);
+            block = MemPool.SelectFromMemPool(block);
 
         ulong fees = CalculateFees(block);
         var coinbaseTx = Tx.CreateCoinbase(payCoinbaseToAddress, GetBlockSubsidy() + fees,
@@ -145,42 +148,42 @@ public static class PoW
         foundNonce.Value = start + i;
     }
 
-    // public static void MineForever(string payCoinbaseToAddress)
-    // {
-    //     Chain.LoadFromDisk();
-    //
-    //     if (NetClient.SendMsgRandom(new GetBlockMsg(Chain.ActiveChain.Last().Id())))
-    //     {
-    //         Logger.Information("Starting initial block sync");
-    //
-    //         long start = Utils.GetUnixTimestamp();
-    //         while (!Chain.InitialBlockDownloadComplete.Value)
-    //         {
-    //             if (Utils.GetUnixTimestamp() - start > 60)
-    //             {
-    //                 // TODO: if sync has started but hasnt finished in time, cancel sync and reset chain
-    //
-    //                 Logger.Error("Timeout on initial block sync");
-    //
-    //                 break;
-    //             }
-    //
-    //             Thread.Sleep(16);
-    //         }
-    //     }
-    //
-    //     (byte[] privKey, byte[] pubKey, string myAddress) = Wallet.InitWallet();
-    //     while (true)
-    //     {
-    //         var block = AssembleAndSolveBlock(myAddress);
-    //
-    //         if (block != null)
-    //         {
-    //             Chain.ConnectBlock(block);
-    //             Chain.SaveToDisk();
-    //         }
-    //     }
-    // }
+    public static void MineForever(string payCoinbaseToAddress)
+    {
+        Chain.LoadFromDisk();
+
+        if (NetClient.SendMsgRandom(new GetBlockMsg(Chain.ActiveChain.Last().Id())))
+        {
+            Logger.Information("Starting initial block sync");
+
+            long start = Utils.GetUnixTimestamp();
+            while (!Chain.InitialBlockDownloadComplete.Value)
+            {
+                if (Utils.GetUnixTimestamp() - start > 60)
+                {
+                    // TODO: if sync has started but hasnt finished in time, cancel sync and reset chain
+
+                    Logger.Error("Timeout on initial block sync");
+
+                    break;
+                }
+
+                Thread.Sleep(16);
+            }
+        }
+
+        (byte[] privKey, byte[] pubKey, string myAddress) = Wallet.InitWallet();
+        while (true)
+        {
+            var block = AssembleAndSolveBlock(myAddress);
+
+            if (block != null)
+            {
+                Chain.ConnectBlock(block);
+                Chain.SaveToDisk();
+            }
+        }
+    }
 
     public static ulong CalculateFees(Block block)
     {

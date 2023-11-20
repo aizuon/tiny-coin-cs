@@ -31,11 +31,6 @@ public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>, ICloneable
         LockTime = lockTime;
     }
 
-    public Tx Clone()
-    {
-        return Deserialize(Serialize());
-    }
-
     public static Tx Deserialize(BinaryBuffer buffer)
     {
         var tx = new Tx();
@@ -46,7 +41,12 @@ public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>, ICloneable
 
         tx.TxIns = new List<TxIn>((int)txInSize);
         for (int i = 0; i < txInSize; i++)
-            tx.TxIns.Add(TxIn.Deserialize(buffer));
+        {
+            var txIn = TxIn.Deserialize(buffer);
+            if (txIn == null)
+                return null;
+            tx.TxIns.Add(txIn);
+        }
 
         uint txOutSize = 0;
         if (!buffer.ReadSize(ref txOutSize))
@@ -54,7 +54,12 @@ public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>, ICloneable
 
         tx.TxOuts = new List<TxOut>((int)txOutSize);
         for (int i = 0; i < txOutSize; i++)
-            tx.TxOuts.Add(TxOut.Deserialize(buffer));
+        {
+            var txOut = TxOut.Deserialize(buffer);
+            if (txOut == null)
+                return null;
+            tx.TxOuts.Add(txOut);
+        }
 
         if (!buffer.Read(ref tx.LockTime))
             return null;
@@ -128,8 +133,8 @@ public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>, ICloneable
                 if (req.SiblingsInBlock.Count != 0)
                     utxo = UTXO.FindInList(txIn, req.SiblingsInBlock);
 
-                if (req.Allow_UTXO_FromMempool)
-                    utxo = Mempool.Find_UTXO_InMempool(txIn.ToSpend);
+                if (req.Allow_UTXO_FromMemPool)
+                    utxo = MemPool.Find_UTXO_InMemPool(txIn.ToSpend);
 
                 if (utxo == null)
                     throw new TxValidationException(
@@ -219,7 +224,7 @@ public class Tx : ISerializable, IDeserializable<Tx>, IEquatable<Tx>, ICloneable
 
     public class ValidateRequest
     {
-        public bool Allow_UTXO_FromMempool = true;
+        public bool Allow_UTXO_FromMemPool = true;
         public bool AsCoinbase = false;
         public IList<Tx> SiblingsInBlock = new List<Tx>();
     }

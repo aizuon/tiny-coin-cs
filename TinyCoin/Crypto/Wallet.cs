@@ -1,10 +1,12 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Serilog;
 using Serilog.Core;
 using TinyCoin.BlockChain;
 using TinyCoin.P2P;
+using TinyCoin.P2P.Messages;
 using TinyCoin.Txs;
 using UTXO = TinyCoin.Txs.UnspentTxOut;
 
@@ -115,35 +117,35 @@ public static class Wallet
         var tx = BuildTx_Miner(value, fee, address, privKey);
         if (tx == null)
             return null;
-        Logger.Information("Built transaction {}, adding to mempool", tx.Id());
-        Mempool.AddTxToMempool(tx);
-        // NetClient::SendMsgRandom(TxInfoMsg(tx));
+        Logger.Information("Built transaction {}, adding to MemPool", tx.Id());
+        MemPool.AddTxToMemPool(tx);
+        NetClient.SendMsgRandom(new TxInfoMsg(tx));
 
         return tx;
     }
 
-    // public static Tx SendValue(ulong value, ulong fee, string address, byte[] privKey)
-    // {
-    //     var tx = BuildTx(value, fee, address, privKey);
-    //     if (tx == null)
-    //         return null;
-    //     Logger.Information("Built transaction {}, broadcasting", tx.Id());
-    //     if (!NetClient.SendMsgRandom(new TxInfoMsg(tx)))
-    //         Logger.Error("No connection to send transaction");
-    //
-    //     return tx;
-    // }
+    public static Tx SendValue(ulong value, ulong fee, string address, byte[] privKey)
+    {
+        var tx = BuildTx(value, fee, address, privKey);
+        if (tx == null)
+            return null;
+        Logger.Information("Built transaction {}, broadcasting", tx.Id());
+        if (!NetClient.SendMsgRandom(new TxInfoMsg(tx)))
+            Logger.Error("No connection to send transaction");
+
+        return tx;
+    }
 
     public static TxStatusResponse GetTxStatus_Miner(string tx_id)
     {
         var ret = new TxStatusResponse();
 
-        lock (Mempool.Mutex)
+        lock (MemPool.Mutex)
         {
-            foreach (string tx in Mempool.Map.Keys)
+            foreach (string tx in MemPool.Map.Keys)
                 if (tx == tx_id)
                 {
-                    ret.Status = TxStatus.Mempool;
+                    ret.Status = TxStatus.MemPool;
 
                     return ret;
                 }
@@ -171,108 +173,109 @@ public static class Wallet
         return ret;
     }
 
-    // public static TxStatusResponse GetTxStatus(string tx_id)
-    // {
-    //     var ret = new TxStatusResponse();
-    //
-    //     if (MsgCache.SendMempoolMsg != null)
-    //         MsgCache.SendMempoolMsg = null;
-    //
-    //     if (!NetClient.SendMsgRandom(new GetMempoolMsg()))
-    //     {
-    //         Logger.Error("No connection to ask mempool");
-    //
-    //         return ret;
-    //     }
-    //
-    //     long start = Utils.GetUnixTimestamp();
-    //     while (MsgCache.SendMempoolMsg == null)
-    //     {
-    //         if (Utils.GetUnixTimestamp() - start > MsgCache.MAX_MSG_AWAIT_TIME_IN_SECS)
-    //         {
-    //             Logger.Error("Timeout on GetMempoolMsg");
-    //
-    //             return ret;
-    //         }
-    //
-    //         Thread.Sleep(16);
-    //     }
-    //
-    //     foreach (var tx in MsgCache.SendMempoolMsg.Mempool)
-    //         if (tx == tx_id)
-    //         {
-    //             ret.Status = TxStatus.Mempool;
-    //
-    //             return ret;
-    //         }
-    //
-    //     if (MsgCache.SendActiveChainMsg != null)
-    //         MsgCache.SendActiveChainMsg = null;
-    //
-    //     if (!NetClient.SendMsgRandom(new GetActiveChainMsg()))
-    //     {
-    //         Logger.Error("No connection to ask active chain");
-    //
-    //         return ret;
-    //     }
-    //
-    //     start = Utils.GetUnixTimestamp();
-    //     while (MsgCache.SendActiveChainMsg == null)
-    //     {
-    //         if (Utils.GetUnixTimestamp() - start > MsgCache.MAX_MSG_AWAIT_TIME_IN_SECS)
-    //         {
-    //             Logger.Error("Timeout on GetActiveChainMsg");
-    //
-    //             return ret;
-    //         }
-    //
-    //         Thread.Sleep(16);
-    //     }
-    //
-    //     for (uint height = 0; height < MsgCache.SendActiveChainMsg.ActiveChain.Count; height++)
-    //     {
-    //         var block = MsgCache.SendActiveChainMsg.ActiveChain[(int)height];
-    //         foreach (var tx in block.Txs)
-    //             if (tx.Id() == tx_id)
-    //             {
-    //                 ret.Status = TxStatus.Mined;
-    //                 ret.BlockId = block.Id();
-    //                 ret.BlockHeight = height;
-    //
-    //                 return ret;
-    //             }
-    //     }
-    //
-    //     ret.Status = TxStatus.NotFound;
-    //
-    //     return ret;
-    // }
+    public static TxStatusResponse GetTxStatus(string tx_id)
+    {
+        var ret = new TxStatusResponse();
 
-    // public static void PrintTxStatus(string txId)
-    // {
-    // 	var response = GetTxStatus(txId);
-    // 	switch (response.Status)
-    // 	{
-    // 	case TxStatus.Mempool:
-    // 	{
-    // 		Logger.Information("Transaction {} is in mempool", txId);
-    //
-    // 		break;
-    // 	}
-    // 	case TxStatus.Mined:
-    // 	{
-    // 		Logger.Information("Transaction {} is mined in {} at height {}", txId, response.BlockId, response.BlockHeight);
-    //
-    // 		break;
-    // 	}
-    // 	case TxStatus.NotFound:
-    // 	{
-    // 		Logger.Information("Transaction {} not found", txId);
-    //
-    // 		break;
-    // 	}
-    // 	}
-    // }
+        if (MsgCache.SendMemPoolMsg != null)
+            MsgCache.SendMemPoolMsg = null;
+
+        if (!NetClient.SendMsgRandom(new GetMemPoolMsg()))
+        {
+            Logger.Error("No connection to ask MemPool");
+
+            return ret;
+        }
+
+        long start = Utils.GetUnixTimestamp();
+        while (MsgCache.SendMemPoolMsg == null)
+        {
+            if (Utils.GetUnixTimestamp() - start > MsgCache.MaxMsgAwaitTimeInSecs)
+            {
+                Logger.Error("Timeout on GetMemPoolMsg");
+
+                return ret;
+            }
+
+            Thread.Sleep(16);
+        }
+
+        foreach (string tx in MsgCache.SendMemPoolMsg.MemPool)
+            if (tx == tx_id)
+            {
+                ret.Status = TxStatus.MemPool;
+
+                return ret;
+            }
+
+        if (MsgCache.SendActiveChainMsg != null)
+            MsgCache.SendActiveChainMsg = null;
+
+        if (!NetClient.SendMsgRandom(new GetActiveChainMsg()))
+        {
+            Logger.Error("No connection to ask active chain");
+
+            return ret;
+        }
+
+        start = Utils.GetUnixTimestamp();
+        while (MsgCache.SendActiveChainMsg == null)
+        {
+            if (Utils.GetUnixTimestamp() - start > MsgCache.MaxMsgAwaitTimeInSecs)
+            {
+                Logger.Error("Timeout on GetActiveChainMsg");
+
+                return ret;
+            }
+
+            Thread.Sleep(16);
+        }
+
+        for (uint height = 0; height < MsgCache.SendActiveChainMsg.ActiveChain.Count; height++)
+        {
+            var block = MsgCache.SendActiveChainMsg.ActiveChain[(int)height];
+            foreach (var tx in block.Txs)
+                if (tx.Id() == tx_id)
+                {
+                    ret.Status = TxStatus.Mined;
+                    ret.BlockId = block.Id();
+                    ret.BlockHeight = height;
+
+                    return ret;
+                }
+        }
+
+        ret.Status = TxStatus.NotFound;
+
+        return ret;
+    }
+
+    public static void PrintTxStatus(string txId)
+    {
+        var response = GetTxStatus(txId);
+        switch (response.Status)
+        {
+            case TxStatus.MemPool:
+            {
+                Logger.Information("Transaction {} is in MemPool", txId);
+
+                break;
+            }
+            case TxStatus.Mined:
+            {
+                Logger.Information("Transaction {} is mined in {} at height {}", txId, response.BlockId,
+                    response.BlockHeight);
+
+                break;
+            }
+            case TxStatus.NotFound:
+            {
+                Logger.Information("Transaction {} not found", txId);
+
+                break;
+            }
+        }
+    }
 
     public static ulong GetBalance_Miner(string address)
     {
@@ -284,21 +287,21 @@ public static class Wallet
         return value;
     }
 
-    // public static ulong GetBalance(string address)
-    // {
-    // 	var utxos = FindUTXOsForAddress(address);
-    // 	ulong value = 0;
-    //     foreach (var utxo in utxos)
-    //         value += utxo.TxOut.Value;
-    //
-    // 	return value;
-    // }
+    public static ulong GetBalance(string address)
+    {
+        var utxos = FindUTXOsForAddress(address);
+        ulong value = 0;
+        foreach (var utxo in utxos)
+            value += utxo.TxOut.Value;
 
-    // public static void PrintBalance(string address)
-    // {
-    // 	ulong balance = GetBalance(address);
-    // 	Logger.Information("Address {} holds {} coins", address, balance);
-    // }
+        return value;
+    }
+
+    public static void PrintBalance(string address)
+    {
+        ulong balance = GetBalance(address);
+        Logger.Information("Address {} holds {} coins", address, balance);
+    }
 
     private static Tx BuildTxFromUTXOs(IList<UTXO> utxos, ulong value, ulong fee,
         string address, string changeAddress,
@@ -359,20 +362,20 @@ public static class Wallet
         return BuildTxFromUTXOs(myCoins, value, fee, address, myAddress, privKey);
     }
 
-    // private static Tx BuildTx(ulong value, ulong fee, string address, byte[] privKey)
-    // {
-    //     byte[] pubKey = ECDSA.GetPubKeyFromPrivKey(privKey);
-    //     string myAddress = PubKeyToAddress(pubKey);
-    //     var myCoins = FindUTXOsForAddress(myAddress);
-    //     if (myCoins.empty())
-    //     {
-    //         Logger.Error("No coins found");
-    //
-    //         return null;
-    //     }
-    //
-    //     return BuildTxFromUTXOs(myCoins, value, fee, address, myAddress, privKey);
-    // }
+    private static Tx BuildTx(ulong value, ulong fee, string address, byte[] privKey)
+    {
+        byte[] pubKey = ECDSA.GetPubKeyFromPrivKey(privKey);
+        string myAddress = PubKeyToAddress(pubKey);
+        var myCoins = FindUTXOsForAddress(myAddress);
+        if (myCoins.Count == 0)
+        {
+            Logger.Error("No coins found");
+
+            return null;
+        }
+
+        return BuildTxFromUTXOs(myCoins, value, fee, address, myAddress, privKey);
+    }
 
     private static IList<UTXO> FindUTXOsForAddress_Miner(string address)
     {
@@ -388,37 +391,37 @@ public static class Wallet
         return utxos;
     }
 
-    // private static IList<UTXO> FindUTXOsForAddress(string address)
-    // {
-    //     if (MsgCache.SendUTXOsMsg != null)
-    //         MsgCache.SendUTXOsMsg = null;
-    //
-    //     if (!NetClient.SendMsgRandom(new GetUTXOsMsg()))
-    //     {
-    //         Logger.Error("No connection to ask UTXO set");
-    //
-    //         return new List<UTXO>();
-    //     }
-    //
-    //     long start = Utils.GetUnixTimestamp();
-    //     while (MsgCache.SendUTXOsMsg == null)
-    //     {
-    //         if (Utils.GetUnixTimestamp() - start > MsgCache.MAX_MSG_AWAIT_TIME_IN_SECS)
-    //         {
-    //             Logger.Error("Timeout on GetUTXOsMsg");
-    //
-    //             return new List<UTXO>();
-    //         }
-    //
-    //         Thread.Sleep(16);
-    //     }
-    //
-    //     var utxos = new List<UTXO>();
-    //     foreach (var v in MsgCache.SendUTXOsMsg->UTXO_Map.Values)
-    //         if (v.TxOut.ToAddress == address)
-    //             utxos.Add(v);
-    //     return utxos;
-    // }
+    private static IList<UTXO> FindUTXOsForAddress(string address)
+    {
+        if (MsgCache.SendUTXOsMsg != null)
+            MsgCache.SendUTXOsMsg = null;
+
+        if (!NetClient.SendMsgRandom(new GetUTXOsMsg()))
+        {
+            Logger.Error("No connection to ask UTXO set");
+
+            return new List<UTXO>();
+        }
+
+        long start = Utils.GetUnixTimestamp();
+        while (MsgCache.SendUTXOsMsg == null)
+        {
+            if (Utils.GetUnixTimestamp() - start > MsgCache.MaxMsgAwaitTimeInSecs)
+            {
+                Logger.Error("Timeout on GetUTXOsMsg");
+
+                return new List<UTXO>();
+            }
+
+            Thread.Sleep(16);
+        }
+
+        var utxos = new List<UTXO>();
+        foreach (var v in MsgCache.SendUTXOsMsg.UTXOs.Values)
+            if (v.TxOut.ToAddress == address)
+                utxos.Add(v);
+        return utxos;
+    }
 
     public class TxStatusResponse
     {

@@ -31,11 +31,6 @@ public class UnspentTxOut : ISerializable, IDeserializable<UnspentTxOut>, IEquat
         Height = height;
     }
 
-    public UnspentTxOut Clone()
-    {
-        return Deserialize(Serialize());
-    }
-
     public static UnspentTxOut Deserialize(BinaryBuffer buffer)
     {
         var unspentTxOut = new UnspentTxOut();

@@ -18,11 +18,6 @@ public class TxOutPoint : ISerializable, IDeserializable<TxOutPoint>, IEquatable
         TxOutIdx = txOutIdx;
     }
 
-    public TxOutPoint Clone()
-    {
-        return Deserialize(Serialize());
-    }
-
     public static TxOutPoint Deserialize(BinaryBuffer buffer)
     {
         var txOutPoint = new TxOutPoint();

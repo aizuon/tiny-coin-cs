@@ -164,14 +164,14 @@ public class BlockChainTests
     {
         Chain.ActiveChain.Clear();
         Chain.SideBranches.Clear();
-        Mempool.Map.Clear();
+        MemPool.Map.Clear();
         UTXO.Map.Clear();
 
         foreach (var block in Chain1)
             Assert.Equal(Chain.ActiveChainIdx, Chain.ConnectBlock(block));
 
         Chain.SideBranches.Clear();
-        Mempool.Map.Clear();
+        MemPool.Map.Clear();
         UTXO.Map.Clear();
 
         foreach (var block in Chain.ActiveChain)
@@ -190,7 +190,7 @@ public class BlockChainTests
         Assert.Equal(Chain1.Count, Chain.ActiveChain.Count);
         for (uint i = 0; i < Chain.ActiveChain.Count; i++)
             Assert.Equal(Chain1[(int)i], Chain.ActiveChain[(int)i]);
-        Assert.True(Mempool.Map.Count == 0);
+        Assert.True(MemPool.Map.Count == 0);
         string[] txIds = { "b6678c", "b90f9b", "b6678c" };
         Assert.Equal(txIds.Length, UTXO.Map.Count);
         foreach (var k in UTXO.Map.Keys)
@@ -216,7 +216,7 @@ public class BlockChainTests
         Assert.Equal(Chain.ActiveChain.Count, Chain1.Count);
         for (uint i = 0; i < Chain.ActiveChain.Count; i++)
             Assert.Equal(Chain1[(int)i], Chain.ActiveChain[(int)i]);
-        Assert.True(Mempool.Map.Count == 0);
+        Assert.True(MemPool.Map.Count == 0);
         Assert.Equal(txIds.Length, UTXO.Map.Count);
         foreach (var k in UTXO.Map.Keys)
         {
@@ -245,7 +245,7 @@ public class BlockChainTests
         Assert.Equal(Chain.ActiveChain.Count, Chain1.Count);
         for (uint i = 0; i < Chain.ActiveChain.Count; i++)
             Assert.Equal(Chain1[(int)i], Chain.ActiveChain[(int)i]);
-        Assert.True(Mempool.Map.Count == 0);
+        Assert.True(MemPool.Map.Count == 0);
         Assert.Equal(txIds.Length, UTXO.Map.Count);
         foreach (var k in UTXO.Map.Keys)
         {
@@ -275,7 +275,7 @@ public class BlockChainTests
         var sideBranchTest2 = new List<Block> { Chain1[1], Chain1[2] };
         for (uint i = 0; i < Chain.SideBranches[0].Count; i++)
             Assert.Equal(sideBranchTest2[(int)i], Chain.SideBranches[0][(int)i]);
-        Assert.True(Mempool.Map.Count == 0);
+        Assert.True(MemPool.Map.Count == 0);
         string[] txIds2 = { "b90f9b", "b6678c", "b6678c", "b6678c", "b6678c" };
         Assert.Equal(UTXO.Map.Count, txIds2.Length);
         foreach (var k in UTXO.Map.Keys)
@@ -298,7 +298,7 @@ public class BlockChainTests
     {
         Chain.ActiveChain.Clear();
         Chain.SideBranches.Clear();
-        Mempool.Map.Clear();
+        MemPool.Map.Clear();
         UTXO.Map.Clear();
 
         Assert.Equal(Chain.ActiveChainIdx, Chain.ConnectBlock(Chain1[0]));
@@ -332,8 +332,8 @@ public class BlockChainTests
 
         Chain.ConnectBlock(Chain1[2]);
 
-        Mempool.AddTxToMempool(tx1);
-        Assert.True(Mempool.Map.ContainsKey(tx1.Id()));
+        MemPool.AddTxToMemPool(tx1);
+        Assert.True(MemPool.Map.ContainsKey(tx1.Id()));
 
         var txOut2 = new TxOut(9001, txOut1.ToAddress);
         var txOuts2 = new List<TxOut> { txOut2 };
@@ -341,8 +341,8 @@ public class BlockChainTests
         var txIn2 = Wallet.BuildTxIn(privKey, txOutPoint2, txOuts2);
         var tx2 = new Tx(new List<TxIn> { txIn2 }, txOuts2, 0);
 
-        Mempool.AddTxToMempool(tx2);
-        Assert.False(Mempool.Map.ContainsKey(tx2.Id()));
+        MemPool.AddTxToMemPool(tx2);
+        Assert.False(MemPool.Map.ContainsKey(tx2.Id()));
 
         Assert.Throws<TxValidationException>(() =>
         {
@@ -361,8 +361,8 @@ public class BlockChainTests
         txIn2 = Wallet.BuildTxIn(privKey, txOutPoint2, txOuts2);
         tx2.TxIns[0] = txIn2;
 
-        Mempool.AddTxToMempool(tx2);
-        Assert.True(Mempool.Map.ContainsKey(tx2.Id()));
+        MemPool.AddTxToMemPool(tx2);
+        Assert.True(MemPool.Map.ContainsKey(tx2.Id()));
 
         var block = PoW.AssembleAndSolveBlock(address);
 
@@ -373,8 +373,8 @@ public class BlockChainTests
         var txs = new[] { tx1, tx2 };
         for (uint i = 0; i < txs.Length; i++)
             Assert.Equal(txs[(int)i], block.Txs[(int)(i + 1)]);
-        Assert.False(Mempool.Map.ContainsKey(tx1.Id()));
-        Assert.False(Mempool.Map.ContainsKey(tx2.Id()));
+        Assert.False(MemPool.Map.ContainsKey(tx1.Id()));
+        Assert.False(MemPool.Map.ContainsKey(tx2.Id()));
         var mapIt1 =
             UTXO.Map.Keys.FirstOrDefault(txOutPoint => txOutPoint.TxId == tx1.Id() && txOutPoint.TxOutIdx == 0);
         Assert.Null(mapIt1);
@@ -389,7 +389,7 @@ public class BlockChainTests
     {
         Chain.ActiveChain.Clear();
         Chain.SideBranches.Clear();
-        Mempool.Map.Clear();
+        MemPool.Map.Clear();
         UTXO.Map.Clear();
 
         (byte[] minerPrivKey, _, string minerAddress) = Wallet.InitWallet("miner.dat");
@@ -412,7 +412,7 @@ public class BlockChainTests
         var tx = Wallet.SendValue_Miner(firstBlock.Txs.First().TxOuts.First().Value / 2, 100, receiverAddress,
             minerPrivKey);
         Assert.NotNull(tx);
-        Assert.Equal(TxStatus.Mempool, Wallet.GetTxStatus_Miner(tx.Id()).Status);
+        Assert.Equal(TxStatus.MemPool, Wallet.GetTxStatus_Miner(tx.Id()).Status);
 
         var postTxBlock = PoW.AssembleAndSolveBlock(minerAddress);
         Assert.NotNull(postTxBlock);
